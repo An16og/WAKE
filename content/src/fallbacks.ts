@@ -472,5 +472,134 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
       hint: 'The pressure gauge is already in the red zone.'
     },
     hint: 'Steam is your shield.'
+  },
+  {
+    id: 'fallback-bandersnatch-4',
+    template: 'bandersnatch',
+    difficulty: 2,
+    params: {
+      scenario: 'At the grease-coated table sits the towering silhouette. It extends long segmented fingers. The basement stairs beckon beyond its hunched back.',
+      timeLimitSec: 8,
+      choices: [
+        {
+          id: 'choice-topple',
+          label: 'A: TOPPLE TABLE & SPRINT',
+          description: 'Heave the wooden table into the figure and sprint past.',
+          consequence: 'The heavy oak table crashes into the silhouette, sending rusted cutlery flying! You vault past it toward the stairwell before it recovers!',
+          distanceDelta: 1
+        },
+        {
+          id: 'choice-shadows',
+          label: 'B: SLIP ALONG THE SHADOWS',
+          description: 'Crawl low against the cupboards in silence.',
+          consequence: 'You creep silently below its line of sight. Its head tilts backward toward the ceiling as you slip beneath its arm!',
+          distanceDelta: 2
+        },
+        {
+          id: 'choice-salt',
+          label: 'C: [SALT_SHAKER] SCATTER MINERAL BARRIER',
+          description: 'Hurl coarse salt across the floorboards.',
+          consequence: 'The salt burns into the floor with a violent white flash! The creature howls in agony, recoiling away from the threshold!',
+          distanceDelta: 3,
+          requiredItem: 'salt_shaker'
+        }
+      ],
+      defaultChoiceIndex: 0,
+      hint: 'Move before its fingers close.'
+    },
+    hint: 'Speed over hesitation.'
+  },
+  {
+    id: 'fallback-bandersnatch-5',
+    template: 'bandersnatch',
+    difficulty: 1,
+    params: {
+      scenario: 'You open your eyes. Heavy claws drag beneath the floorboards under your bed. The hallway door is ajar.',
+      timeLimitSec: 10,
+      choices: [
+        {
+          id: 'choice-bolt',
+          label: 'A: ROLL OUT AND BOLT',
+          description: 'Leap from the mattress and bolt through the open door.',
+          consequence: 'You throw yourself from the sheets and sprint into the corridor as floorboards splinter behind your heels!',
+          distanceDelta: 1
+        },
+        {
+          id: 'choice-freeze',
+          label: 'B: HOLD BREATH AND FREEZE',
+          description: 'Remain perfectly motionless until the claws pass.',
+          consequence: 'You bite your lip until it bleeds, holding completely still. The scratching pauses, then drags away toward the kitchen!',
+          distanceDelta: 2
+        },
+        {
+          id: 'choice-bed-flash',
+          label: 'C: [FLASHLIGHT] SHINE UNDER BED',
+          description: 'Point the high-beam flashlight under the frame.',
+          consequence: 'The blinding cone illuminates a nest of black tendrils that instantly dissolve with a sickening sizzle! The path is clear!',
+          distanceDelta: 3,
+          requiredItem: 'flashlight'
+        }
+      ],
+      defaultChoiceIndex: 0,
+      hint: 'The awakening dilemma.'
+    },
+    hint: 'Listen closely.'
+  },
+  {
+    id: 'fallback-bandersnatch-6',
+    template: 'bandersnatch',
+    difficulty: 4,
+    params: {
+      scenario: 'The walls have turned into wet, twitching sinew. The footsteps behind you are clicking in exact rhythm with your own feet. Ahead lies the silver vault.',
+      timeLimitSec: 7,
+      choices: [
+        {
+          id: 'choice-vault-dash',
+          label: 'A: SPRINT AT THE VAULT',
+          description: 'Throw your entire momentum forward into the silver vault doorway.',
+          consequence: 'You accelerate down the pulsing hallway, diving through the vault archway as cold fingers graze your neck!',
+          distanceDelta: 2
+        },
+        {
+          id: 'choice-turn-face',
+          label: 'B: STOP AND MATCH THE GAIT',
+          description: 'Stop running. Breathe in sync with the beast.',
+          consequence: 'You halt your run. The footsteps behind you pause simultaneously. The voice in your skull whispers: "Finally."',
+          distanceDelta: 2
+        }
+      ],
+      defaultChoiceIndex: 0,
+      hint: 'The mirror chamber is directly ahead.'
+    },
+    hint: 'You are almost at the glass.'
+  },
+  {
+    id: 'fallback-bandersnatch-7',
+    template: 'bandersnatch',
+    difficulty: 3,
+    params: {
+      scenario: 'Inside the tight pantry, rotten cans tremble on the shelves. Outside, the creature sniffs the door gap. A bottle of ethanol rests on the top shelf.',
+      timeLimitSec: 8,
+      choices: [
+        {
+          id: 'choice-drink',
+          label: 'A: [ETHANOL] DRINK ETHANOL',
+          description: 'Swallow the chemical fire to silence your terror.',
+          consequence: 'The burning fluid numbs your racing pulse. You slip past the alcove in dead silence without breathing a sound!',
+          distanceDelta: 3,
+          requiredItem: 'ethanol'
+        },
+        {
+          id: 'choice-distract',
+          label: 'B: HURL CAN REARWARD',
+          description: 'Throw a heavy metal can against the far wall.',
+          consequence: 'The loud clatter echoes through the kitchen! The beast lunges toward the sound, leaving your exit completely unguarded!',
+          distanceDelta: 2
+        }
+      ],
+      defaultChoiceIndex: 1,
+      hint: 'Sound carries far in the quiet house.'
+    },
+    hint: 'Create an opening.'
   }
 ];

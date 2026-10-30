@@ -13,11 +13,6 @@ import {
   FALLBACK_CHALLENGES
 } from '@wake/content';
 import {
-  WordleRunner,
-  BlackjackRunner,
-  CipherRunner,
-  SimonRunner,
-  DarkMazeRunner,
   BandersnatchRunner,
   MinigameState
 } from './minigames/runners.js';
@@ -452,41 +447,19 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
     }
   };
 
-  switch (challengeToRun.template) {
-    case 'wordle':
-      activeMinigame = new WordleRunner(state);
-      break;
-    case 'blackjack':
-      activeMinigame = new BlackjackRunner(state);
-      break;
-    case 'cipher':
-      activeMinigame = new CipherRunner(state);
-      break;
-    case 'simon':
-      activeMinigame = new SimonRunner(state);
-      break;
-    case 'dark_maze':
-      activeMinigame = new DarkMazeRunner(state);
-      break;
-    case 'bandersnatch':
-      activeMinigame = new BandersnatchRunner(state);
-      // Populate quick clickable action pills for the choices
-      actionPillsEl.innerHTML = '';
-      ['A', 'B', 'C'].forEach((opt) => {
-        const btn = document.createElement('button');
-        btn.className = 'action-pill';
-        btn.textContent = `CHOICE [ ${opt} ]`;
-        btn.addEventListener('click', () => {
-          inputEl.value = opt;
-          handleCommand(opt);
-        });
-        actionPillsEl.appendChild(btn);
-      });
-      break;
-    default:
-      solvedRooms.add(currentRoomId);
-      return;
-  }
+  activeMinigame = new BandersnatchRunner(state);
+  // Populate quick clickable action pills for the choices
+  actionPillsEl.innerHTML = '';
+  ['A', 'B', 'C'].forEach((opt) => {
+    const btn = document.createElement('button');
+    btn.className = 'action-pill';
+    btn.textContent = `CHOICE [ ${opt} ]`;
+    btn.addEventListener('click', () => {
+      inputEl.value = opt;
+      handleCommand(opt);
+    });
+    actionPillsEl.appendChild(btn);
+  });
 
   activeMinigame.start();
 }

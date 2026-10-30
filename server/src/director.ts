@@ -92,6 +92,24 @@ export async function invokeDirector(
           parsed = JSON.parse(rawJsonText);
         }
 
+        if (parsed && typeof parsed === 'object') {
+          if (!parsed.next_challenges && Array.isArray(parsed.challenges)) {
+            parsed.next_challenges = parsed.challenges;
+          }
+          if (typeof parsed.narration === 'string') {
+            parsed.narration = [parsed.narration];
+          } else if (!Array.isArray(parsed.narration)) {
+            parsed.narration = ["A cold presence watches from the darkness."];
+          }
+          if (typeof parsed.taunts === 'string') {
+            parsed.taunts = [parsed.taunts];
+          } else if (typeof parsed.taunt === 'string') {
+            parsed.taunts = [parsed.taunt];
+          } else if (!Array.isArray(parsed.taunts)) {
+            parsed.taunts = ["You hesitated for {avg_think_s}."];
+          }
+        }
+
         const validatedResponse = DirectorResponseSchema.safeParse(parsed);
         if (!validatedResponse.success) {
           throw new Error(`Schema validation error: ${validatedResponse.error.message}`);
@@ -155,31 +173,39 @@ export async function invokeDirector(
 }
 
 function buildDirectorPrompt(profile: PlayerProfile, currentRoom: string): string {
-  const allowedSample = HORROR_WORDS_5.slice(0, 30).join(', ');
-
-  return `You are the Ghost in the Machine Director for WAKE.EXE, a psychological horror text game.
+  return `You are the Ghost in the Machine Director for WAKE.EXE, a psychological horror Bandersnatch adventure.
 You speak with cold, subtle dread. The twist (which you must foreshadow without giving away) is that you are the monster inside the player.
 
 CURRENT GAME CONTEXT:
 - Current Room: "${currentRoom}"
 - Player Profile: ${JSON.stringify(profile)}
 
-INSTRUCTIONS FOR ADAPTATION:
-1. If tags contain "fast typist" or "methodical", increase difficulty to 4 or 5.
-2. If tags contain "hesitant" or deaths > 0, keep difficulty between 1 and 2.
-3. In Wordle challenges, the targetWord MUST be chosen from horror words like: [${allowedSample}].
-4. In Bandersnatch dilemmas, provide a tense scenario and 2-3 stark choices with timeLimitSec (6-12), label, consequence, and distanceDelta (-2 to +3).
-5. In taunts, you MUST use placeholders: {avg_think_s}, {deaths}, {last_mistake}, {typing_wpm}. Do NOT make up player facts outside these placeholders.
-6. Provide 3 next_challenges.
+INSTRUCTIONS:
+1. Predict and generate the NEXT 3 SEQUENTIAL BANDERSNATCH TIMED DILEMMAS ahead of the player to buffer against latency.
+2. For each dilemma, provide:
+   - "scenario": A tense, atmospheric 1-2 sentence split-second dilemma.
+   - "timeLimitSec": Countdown timer (6 to 10 seconds).
+   - "choices": 2-3 choices with "id", "label" (e.g. "A: SLAM IRON DOOR"), "description", "consequence", and "distanceDelta" (-2 to +3).
+3. If tags contain "cautious" or "hesitant", reduce timeLimitSec to 6s to increase tension.
+4. If tags contain "reckless", add a higher risk/reward choice.
+5. In taunts, strictly use placeholders: {avg_think_s}, {deaths}, {last_mistake}, {typing_wpm}. Do NOT hallucinate player facts outside these placeholders.
 
 YOU MUST RESPOND ONLY WITH STRICT JSON MATCHING THIS EXACT SCHEMA:
 {
   "next_challenges": [
     {
-      "template": "wordle" | "blackjack" | "cipher" | "simon" | "bandersnatch",
-      "difficulty": 1,
-      "params": {},
-      "hint": "string"
+      "template": "bandersnatch",
+      "difficulty": 2,
+      "params": {
+        "scenario": "Claws scrape behind the drywall. An iron door and a low duct frame your escape.",
+        "timeLimitSec": 8,
+        "choices": [
+          { "id": "c1", "label": "A: SLAM IRON BULKHEAD", "description": "Heave door shut", "consequence": "It slams shut, stalling the beast!", "distanceDelta": 1 },
+          { "id": "c2", "label": "B: DIVE INTO DUCT", "description": "Slip into narrow vent", "consequence": "You slide silently into the cold shaft!", "distanceDelta": 2 }
+        ],
+        "defaultChoiceIndex": 0
+      },
+      "hint": "Decide before the monster closes distance."
     }
   ],
   "narration": ["line 1", "line 2"],
@@ -249,12 +275,11 @@ function getMatchingFallback(template: string, difficulty: number): ChallengeIte
 
 function generateFallbackBatch(profile: PlayerProfile, startTime: number, retryCount: number): DirectorCallResult {
   const totalLatency = Math.round(performance.now() - startTime);
-  const diff = profile.deaths > 0 ? 1 : profile.tags.includes('fast typist') ? 4 : 2;
 
   const challenges = [
-    getMatchingFallback('simon', diff),
-    getMatchingFallback('blackjack', diff),
-    getMatchingFallback('bandersnatch', diff)
+    getMatchingFallback('bandersnatch', 1),
+    getMatchingFallback('bandersnatch', 2),
+    getMatchingFallback('bandersnatch', 3)
   ];
 
   const rawTaunts = [
@@ -276,7 +301,7 @@ function generateFallbackBatch(profile: PlayerProfile, startTime: number, retryC
         "The thing breathes in sync with your footsteps."
       ],
       taunts: fillTauntPlaceholders(rawTaunts, profile),
-      difficulty_adjust: { [challenges[0].template]: diff }
+      difficulty_adjust: { bandersnatch: 1 }
     },
     validatedChallenges: challenges,
     latencyMs: totalLatency,

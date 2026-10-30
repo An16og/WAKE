@@ -3,12 +3,12 @@ import { z } from 'zod';
 export type ProviderType = 'ollama' | 'openai_compat' | 'none';
 
 export const ChallengeTemplateEnum = z.enum([
+  'bandersnatch',
   'wordle',
   'blackjack',
   'cipher',
   'simon',
-  'dark_maze',
-  'bandersnatch'
+  'dark_maze'
 ]);
 export type ChallengeTemplate = z.infer<typeof ChallengeTemplateEnum>;
 
@@ -125,9 +125,9 @@ export const DirectorChallengeProposalSchema = z.object({
 });
 
 export const DirectorResponseSchema = z.object({
-  next_challenges: z.array(DirectorChallengeProposalSchema),
-  narration: z.array(z.string()),
-  taunts: z.array(z.string()),
+  next_challenges: z.array(DirectorChallengeProposalSchema).default([]),
+  narration: z.array(z.string()).default([]),
+  taunts: z.array(z.string()).default([]),
   difficulty_adjust: z.record(z.number()).default({})
 });
 export type DirectorResponse = z.infer<typeof DirectorResponseSchema>;

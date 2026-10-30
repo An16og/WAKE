@@ -33,8 +33,8 @@ export const STORY_ROOMS: Record<string, StoryRoom> = {
       'I woke up drenched in cold sweat.',
       'Something moved in the floorboards beneath my feet.'
     ],
-    challengeTemplate: 'wordle',
-    defaultChallengeId: 'fallback-wordle-1',
+    challengeTemplate: 'bandersnatch',
+    defaultChallengeId: 'fallback-bandersnatch-5',
     exits: [
       { direction: 'north', targetRoomId: 'hallway', locked: false }
     ],
@@ -55,11 +55,11 @@ export const STORY_ROOMS: Record<string, StoryRoom> = {
       'The hallway smelled like ozone and old wet timber.',
       'The footsteps were keeping pace with my heartbeat.'
     ],
-    challengeTemplate: 'simon',
-    defaultChallengeId: 'fallback-simon-1',
+    challengeTemplate: 'bandersnatch',
+    defaultChallengeId: 'fallback-bandersnatch-2',
     exits: [
       { direction: 'south', targetRoomId: 'bedroom' },
-      { direction: 'north', targetRoomId: 'kitchen', locked: true, lockDescription: 'The electrical latch is dead. Align the breaker sequence to power it.' }
+      { direction: 'north', targetRoomId: 'kitchen', locked: true, lockDescription: 'The electrical latch is dead. Resolve the corridor dilemma to push through.' }
     ],
     items: ['chalk'],
     checkpoint: false
@@ -70,20 +70,20 @@ export const STORY_ROOMS: Record<string, StoryRoom> = {
     name: 'RUINED KITCHEN',
     narration: [
       'Black grease coats the counters. Flies circle the rusted sink.',
-      'At the wooden table sits a hunched silhouette, dealing greasy cards.',
-      'It does not look up. "Play a hand," a voice rattles inside your skull.',
+      'At the wooden table sits a hunched silhouette, tapping long segmented claws.',
+      'It does not look up. "Play your choice," a voice rattles inside your skull.',
       '"Or I step closer."'
     ],
     firstPersonDrift: [
       'The grease on the table smelled familiar.',
       'The voice in my skull felt less like a threat and more like memory.'
     ],
-    challengeTemplate: 'blackjack',
-    defaultChallengeId: 'fallback-blackjack-1',
+    challengeTemplate: 'bandersnatch',
+    defaultChallengeId: 'fallback-bandersnatch-4',
     exits: [
       { direction: 'south', targetRoomId: 'hallway' },
       { direction: 'east', targetRoomId: 'pantry' },
-      { direction: 'north', targetRoomId: 'stairwell', locked: true, lockDescription: 'The Thing blocks the doorway with its long arms until you win.' }
+      { direction: 'north', targetRoomId: 'stairwell', locked: true, lockDescription: 'The Thing blocks the doorway with its long arms until you make your move.' }
     ],
     items: ['salt_shaker'],
     checkpoint: true
@@ -100,6 +100,8 @@ export const STORY_ROOMS: Record<string, StoryRoom> = {
     firstPersonDrift: [
       'I hid among the rotten cans. The monster waited outside, listening.'
     ],
+    challengeTemplate: 'bandersnatch',
+    defaultChallengeId: 'fallback-bandersnatch-7',
     exits: [
       { direction: 'west', targetRoomId: 'kitchen' }
     ],
@@ -134,18 +136,18 @@ export const STORY_ROOMS: Record<string, StoryRoom> = {
     name: 'CONCRETE BASEMENT',
     narration: [
       'Pipes rattle overhead, spitting hot vapor.',
-      'An iron furnace looms in the center, welded shut with an inscription.',
+      'An iron furnace screams in the center at critical pressure.',
       'The shadow behind you is now six feet long. You feel hot breath on your neck.'
     ],
     firstPersonDrift: [
       'The heat from the furnace felt like my own skin burning.',
       'I looked at my shadow. It didn\'t have human shoulders.'
     ],
-    challengeTemplate: 'cipher',
-    defaultChallengeId: 'fallback-cipher-1',
+    challengeTemplate: 'bandersnatch',
+    defaultChallengeId: 'fallback-bandersnatch-3',
     exits: [
       { direction: 'up', targetRoomId: 'stairwell' },
-      { direction: 'north', targetRoomId: 'corridor', locked: true, lockDescription: 'The cipher lock on the heavy iron bulkhead must be decrypted.' }
+      { direction: 'north', targetRoomId: 'corridor', locked: true, lockDescription: 'The furnace steam lock blocks the heavy iron bulkhead.' }
     ],
     items: ['wrench'],
     checkpoint: true
@@ -164,11 +166,11 @@ export const STORY_ROOMS: Record<string, StoryRoom> = {
       'I was no longer running from the thing in the dark.',
       'I was heading home.'
     ],
-    challengeTemplate: 'wordle',
-    defaultChallengeId: 'fallback-wordle-2',
+    challengeTemplate: 'bandersnatch',
+    defaultChallengeId: 'fallback-bandersnatch-6',
     exits: [
       { direction: 'south', targetRoomId: 'basement' },
-      { direction: 'north', targetRoomId: 'mirror_room', locked: true, lockDescription: 'Whisper the final word of dread to unseal the mirror chamber.' }
+      { direction: 'north', targetRoomId: 'mirror_room', locked: true, lockDescription: 'Make your final breakthrough decision to unseal the mirror vault.' }
     ],
     items: [],
     checkpoint: true
