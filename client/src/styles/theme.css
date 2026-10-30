@@ -173,280 +173,232 @@ body.monochrome {
   display: none !important;
 }
 
-/* 3D Viewport Card */
-.viewport-card {
-  border: 1px solid var(--border-color);
-  background: var(--panel-bg);
+/* Bandersnatch Cinematic Main View */
+.bandersnatch-main {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  border-radius: 2px;
-  overflow: hidden;
+  justify-content: space-between;
+  padding: 4px 0;
+  min-height: 0;
 }
 
-.viewport-header {
+/* Subtle Top Info Bar */
+.bandersnatch-top-info {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 10px;
-  border-bottom: 1px dashed var(--border-color);
-  background: rgba(0, 0, 0, 0.4);
-  font-size: 17px;
+  font-family: var(--font-family);
+  font-size: 16px;
+  color: var(--fg-dim);
+  padding: 2px 4px 6px 4px;
 }
 
-.room-title {
-  color: var(--fg-bright);
-  font-weight: bold;
+.bs-info-item {
   letter-spacing: 0.08em;
 }
 
-.badge {
-  font-size: 15px;
-  padding: 1px 6px;
-  border: 1px solid var(--border-color);
-  color: var(--fg-bright);
-}
-
-.room-canvas {
+/* Cinematic Viewport Screen Frame */
+.bandersnatch-screen-frame {
+  position: relative;
   width: 100%;
-  height: 220px;
-  display: block;
-  background: #040604;
-  image-rendering: pixelated;
-}
-
-/* Narrative & Minigame Card */
-.narrative-card {
   flex: 1;
-  border: 1px solid var(--border-color);
-  background: var(--panel-bg);
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  min-height: 120px;
-}
-
-.narrative-card::-webkit-scrollbar {
-  width: 5px;
-}
-.narrative-card::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-}
-
-.narrative-text {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 20px;
-  line-height: 1.35;
-}
-
-.minigame-arena {
-  margin-top: 10px;
-  border-top: 1px dashed var(--border-color);
-  padding-top: 8px;
-  font-size: 19px;
-}
-
-/* Bandersnatch Dynamic Arena & In-place Timer */
-.bandersnatch-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid var(--border-color);
-  padding: 10px 14px;
-  border-radius: 2px;
-}
-
-.bandersnatch-header {
-  font-size: 18px;
-  font-weight: bold;
-  letter-spacing: 0.1em;
-  color: var(--fg-bright);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px dashed var(--border-color);
-  padding-bottom: 4px;
-}
-
-.live-indicator {
-  font-size: 14px;
-  color: var(--fg-bright);
-  animation: pulse 1s infinite alternate;
-}
-
-.bandersnatch-scenario {
-  font-size: 19px;
-  line-height: 1.35;
-  color: var(--fg-bright);
-  margin-top: 4px;
-}
-
-.bandersnatch-perk {
-  font-size: 16px;
-  color: var(--fg-bright);
-  background: rgba(0, 255, 65, 0.12);
-  border: 1px solid var(--border-color);
-  padding: 2px 8px;
-  border-radius: 2px;
-}
-
-.bandersnatch-timer-box {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 6px 0;
-  padding: 6px 8px;
-  background: rgba(8, 12, 8, 0.85);
-  border: 1px solid var(--border-color);
-  transition: all 0.2s ease;
-}
-
-.bandersnatch-timer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 17px;
-  font-family: inherit;
-}
-
-.bandersnatch-timer-label {
-  color: var(--fg-dim);
-  letter-spacing: 0.05em;
-  font-size: 16px;
-}
-
-.bandersnatch-timer-digits {
-  font-weight: bold;
-  font-size: 18px;
-  color: var(--fg-bright);
-}
-
-.bandersnatch-progress-track {
-  width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  min-height: 290px;
+  background: #000000;
   border: 1px solid var(--border-color);
   overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.bandersnatch-progress-fill {
-  height: 100%;
+.bandersnatch-canvas {
   width: 100%;
-  background: var(--fg-bright);
-  transition: width 0.15s linear;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  object-fit: contain;
 }
 
-.bandersnatch-timer-box.urgent {
-  border-color: var(--danger-color, #ff3333);
+/* Netflix Bandersnatch Style Subtitle */
+.bandersnatch-subtitle {
+  position: absolute;
+  bottom: 22px;
+  left: 20px;
+  right: 20px;
+  font-family: "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.35;
+  color: #ffffff;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 5px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  z-index: 10;
+  letter-spacing: 0.02em;
+  transition: opacity 0.2s ease;
 }
 
-.bandersnatch-timer-box.urgent .bandersnatch-timer-digits {
-  color: var(--danger-color, #ff3333);
-  text-shadow: 0 0 6px red;
-  animation: pulse 0.35s infinite alternate;
-}
-
-.bandersnatch-timer-box.urgent .bandersnatch-progress-fill {
-  background: var(--danger-color, #ff3333);
-}
-
-.bandersnatch-choices-list {
+/* In-Image Finale Reveal: "IT WAS YOU ALL ALONG" */
+.image-overlay-reveal {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
+  justify-content: center;
+  align-items: center;
+  z-index: 30;
+  text-align: center;
+  padding: 24px;
+  animation: revealPulse 0.5s ease-out forwards;
 }
 
-.bandersnatch-choice-item {
+.reveal-line-main {
+  font-family: "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  color: #ffffff;
+  text-transform: uppercase;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.9), 0 0 35px rgba(255, 50, 50, 0.7);
+  margin-bottom: 14px;
+}
+
+.reveal-line-sub {
+  font-family: "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 20px;
+  font-style: italic;
+  letter-spacing: 0.1em;
+  color: #cccccc;
+  max-width: 640px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+@keyframes revealPulse {
+  0% { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1.0); }
+}
+
+/* 15-Second Reverse Progress Bar (No Counter, Just Clean Tense Shrinking Bar) */
+.bandersnatch-timer-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 10px 0 14px 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.bandersnatch-timer-fill {
+  height: 100%;
+  width: 100%;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  transition: width 0.05s linear;
+}
+
+.bandersnatch-timer-fill.urgent {
+  background: #ff3333;
+  box-shadow: 0 0 12px rgba(255, 50, 50, 0.95);
+}
+
+body.phosphor-green .bandersnatch-timer-fill {
+  background: var(--fg-bright);
+  box-shadow: 0 0 8px rgba(51, 255, 51, 0.8);
+}
+
+body.phosphor-green .bandersnatch-timer-fill.urgent {
+  background: #ff3333;
+  box-shadow: 0 0 12px rgba(255, 50, 50, 0.95);
+}
+
+/* Big Bandersnatch Choice Buttons */
+.bandersnatch-controls-area {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 5px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.bandersnatch-choices-row,
+.bandersnatch-actions-row {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 28px;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.bs-choice-btn {
+  flex: 1;
+  max-width: 380px;
+  min-height: 56px;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+  font-family: "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 14px 20px;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.3);
-  transition: all 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 2px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
   user-select: none;
 }
 
-.bandersnatch-choice-item:hover:not(.locked) {
-  background: var(--accent-color, rgba(0, 255, 65, 0.15));
-  border-color: var(--fg-bright);
+.bs-choice-btn:hover:not(.locked) {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.7);
+  transform: translateY(-2px);
 }
 
-.bandersnatch-choice-item.locked {
-  opacity: 0.45;
+.bs-choice-btn:active:not(.locked) {
+  transform: translateY(1px);
+}
+
+.bs-choice-btn.locked {
+  opacity: 0.35;
   cursor: not-allowed;
   border-style: dashed;
 }
 
-.bandersnatch-choice-key {
-  font-weight: bold;
+body.phosphor-green .bs-choice-btn {
   color: var(--fg-bright);
-  font-size: 18px;
+  border-color: var(--border-color);
 }
 
-.bandersnatch-choice-label {
-  font-weight: bold;
-  color: var(--fg-bright);
+body.phosphor-green .bs-choice-btn:hover:not(.locked) {
+  background: var(--fg-bright);
+  color: #000000;
+  border-color: var(--fg-bright);
+  box-shadow: 0 0 16px rgba(51, 255, 51, 0.7);
 }
 
-.bandersnatch-choice-desc {
-  color: var(--fg-dim);
-  font-size: 17px;
-  margin-left: auto;
-}
-
-/* Available Actions Bar */
-.action-bar-container {
+/* Subtle CLI input */
+.bandersnatch-input-container {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 17px;
-  padding: 2px 4px;
-}
-
-.action-label {
-  color: var(--fg-dim);
-  font-size: 16px;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-}
-
-.action-pills {
-  display: flex;
-  flex-wrap: wrap;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 4px;
   gap: 8px;
-  align-items: center;
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
 }
 
-.action-pill {
-  background: rgba(0, 20, 0, 0.4);
-  border: 1px solid var(--border-color);
-  color: var(--fg-bright);
-  padding: 2px 10px;
-  font-size: 16px;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.1s ease;
-}
-
-.action-pill:hover {
-  background: var(--border-color);
-  color: var(--bg-color);
-  font-weight: bold;
-}
-
-/* Centered Command Prompt Box */
-.prompt-box {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--border-color);
-  background: rgba(0, 10, 0, 0.5);
-  padding: 8px 12px;
-  gap: 8px;
+.bandersnatch-input-container:hover,
+.bandersnatch-input-container:focus-within {
+  opacity: 0.95;
 }
 
 .prompt-arrow {

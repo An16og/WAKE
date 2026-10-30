@@ -127,18 +127,6 @@ function clearNarrative(): void {
   narrativeOutputEl.innerHTML = '';
 }
 
-async function typeWriterNarrative(text: string, speed = 10): Promise<void> {
-  const line = document.createElement('div');
-  narrativeOutputEl.appendChild(line);
-  for (let i = 0; i < text.length; i++) {
-    line.textContent += text[i];
-    narrativeOutputEl.scrollTop = narrativeOutputEl.scrollHeight;
-    soundEngine.playKeyClick();
-    await new Promise((r) => setTimeout(r, speed));
-  }
-  appendHistory(text);
-}
-
 // Distance Meter
 function updateDistance(newDist: number): void {
   distance = Math.max(0, Math.min(10, newDist));
@@ -287,15 +275,18 @@ async function triggerDirectorLookahead(): Promise<void> {
 // Render Available Action Pills
 function renderActionPills(room: any): void {
   actionPillsEl.innerHTML = '';
+  actionPillsEl.classList.remove('hidden');
+
+  const choicesContainerEl = document.getElementById('bandersnatch-choices');
+  if (choicesContainerEl) choicesContainerEl.innerHTML = '';
 
   // Exits
   for (const exit of room.exits) {
     const pill = document.createElement('button');
-    pill.className = 'action-pill';
+    pill.className = 'bs-choice-btn';
     const status = exit.locked && !solvedRooms.has(room.id) ? ' [LOCKED]' : '';
-    pill.textContent = `go ${exit.direction}${status}`;
+    pill.textContent = `GO ${exit.direction.toUpperCase()}${status}`;
     pill.addEventListener('click', () => {
-      inputEl.value = `go ${exit.direction}`;
       handleCommand(`go ${exit.direction}`);
     });
     actionPillsEl.appendChild(pill);
@@ -305,10 +296,9 @@ function renderActionPills(room: any): void {
   if (room.items) {
     for (const it of room.items) {
       const pill = document.createElement('button');
-      pill.className = 'action-pill';
-      pill.textContent = `take ${it}`;
+      pill.className = 'bs-choice-btn';
+      pill.textContent = `TAKE ${it.toUpperCase()}`;
       pill.addEventListener('click', () => {
-        inputEl.value = `take ${it}`;
         handleCommand(`take ${it}`);
       });
       actionPillsEl.appendChild(pill);
@@ -317,8 +307,8 @@ function renderActionPills(room: any): void {
 
   // Common quick actions
   const lookPill = document.createElement('button');
-  lookPill.className = 'action-pill';
-  lookPill.textContent = room.id === 'mirror_room' ? 'look mirror' : 'look';
+  lookPill.className = 'bs-choice-btn';
+  lookPill.textContent = room.id === 'mirror_room' ? 'LOOK MIRROR' : 'LOOK';
   lookPill.addEventListener('click', () => {
     handleCommand(room.id === 'mirror_room' ? 'look mirror' : 'look');
   });
@@ -327,10 +317,9 @@ function renderActionPills(room: any): void {
   // Usable item action pills
   for (const it of inventory) {
     const itPill = document.createElement('button');
-    itPill.className = 'action-pill';
-    itPill.textContent = `use ${it}`;
+    itPill.className = 'bs-choice-btn';
+    itPill.textContent = `USE ${it.toUpperCase()}`;
     itPill.addEventListener('click', () => {
-      inputEl.value = `use ${it}`;
       handleCommand(`use ${it}`);
     });
     actionPillsEl.appendChild(itPill);
@@ -365,14 +354,17 @@ function enterRoom(roomId: string): void {
   const roomSequence = ['bedroom', 'hallway', 'kitchen', 'pantry', 'stairwell', 'basement', 'corridor', 'mirror_room'];
   const driftIndex = roomSequence.indexOf(roomId);
 
+  const subtitleEl = document.getElementById('scene-subtitle');
   if (driftIndex >= 5) {
     for (const line of room.firstPersonDrift) {
       printNarrative(line);
     }
+    if (subtitleEl) subtitleEl.textContent = room.firstPersonDrift[0] || '';
   } else {
     for (const line of room.narration) {
       printNarrative(line);
     }
+    if (subtitleEl) subtitleEl.textContent = room.narration[0] || '';
   }
 
   // Director whisper taunt if distance is close
@@ -453,19 +445,8 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
   };
 
   activeMinigame = new BandersnatchRunner(state);
-  // Populate quick clickable action pills for the choices
   actionPillsEl.innerHTML = '';
-  ['A', 'B', 'C'].forEach((opt) => {
-    const btn = document.createElement('button');
-    btn.className = 'action-pill';
-    btn.textContent = `CHOICE [ ${opt} ]`;
-    btn.addEventListener('click', () => {
-      inputEl.value = opt;
-      handleCommand(opt);
-    });
-    actionPillsEl.appendChild(btn);
-  });
-
+  actionPillsEl.classList.add('hidden');
   activeMinigame.start();
 }
 
@@ -474,6 +455,9 @@ function triggerDeath(): void {
   deaths++;
   soundEngine.playGlitchNoise();
   clearNarrative();
+  const subtitleEl = document.getElementById('scene-subtitle');
+  if (subtitleEl) subtitleEl.textContent = 'THE THING CAUGHT YOU IN THE DARK. Respawning...';
+
   printNarrative('========================================================', 'danger');
   printNarrative('THE THING CAUGHT YOU IN THE DARK.', 'danger');
   for (const l of DEATH_ART) appendHistory(l);
@@ -494,29 +478,45 @@ async function triggerMirrorFinale(): Promise<void> {
   if (isEndingPlayed) return;
   isEndingPlayed = true;
 
+  const subtitleEl = document.getElementById('scene-subtitle');
+  const overlayEl = document.getElementById('image-overlay-reveal');
+  const choicesContainerEl = document.getElementById('bandersnatch-choices');
+  if (choicesContainerEl) choicesContainerEl.innerHTML = '';
+  if (actionPillsEl) actionPillsEl.classList.add('hidden');
+
   clearNarrative();
   printNarrative('========================================================', 'bright');
   printNarrative('YOU APPROACH THE MIRROR VAULT GLASS...', 'bright');
   printNarrative('========================================================\n');
 
+  if (subtitleEl) subtitleEl.textContent = 'You approach the mirror vault glass...';
+
   for (let i = 0; i < MIRROR_MORPH_FRAMES.length; i++) {
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, 700));
     soundEngine.playGlitchNoise();
-    printNarrative(`[REFLECTION CYCLE ${i + 1}/5]`);
-    for (const l of MIRROR_MORPH_FRAMES[i]) {
-      printNarrative(l, i === 4 ? 'bright' : '');
+    if (subtitleEl) {
+      subtitleEl.textContent = `The glass ripples... reflection shifting [${i + 1}/5]`;
     }
   }
 
-  await new Promise((r) => setTimeout(r, 1200));
-  await typeWriterNarrative('\nI looked into the glass.', 20);
-  await typeWriterNarrative('There was no one behind me.', 20);
-  await typeWriterNarrative('The heavy footsteps... were my own paws.', 20);
-  await typeWriterNarrative('The voice in the walls... was my own hunger.', 20);
-  await typeWriterNarrative('I WAS NEVER RUNNING FROM THE MONSTER.', 25);
-  await typeWriterNarrative('I AM THE MONSTER.', 30);
+  await new Promise((r) => setTimeout(r, 900));
+  if (subtitleEl) {
+    subtitleEl.textContent = 'I looked into the glass. The footsteps behind me... were my own.';
+  }
 
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 1400));
+  soundEngine.playGlitchNoise();
+
+  // DISPLAY "IT WAS YOU ALL ALONG" DIRECTLY IN THE IMAGE AREA!
+  if (subtitleEl) subtitleEl.textContent = '';
+  if (overlayEl) {
+    overlayEl.classList.remove('hidden');
+  }
+
+  printNarrative('I WAS NEVER RUNNING FROM THE MONSTER.', 'bright');
+  printNarrative('I AM THE MONSTER.', 'danger');
+
+  await new Promise((r) => setTimeout(r, 3600));
   displayEndingFile();
 }
 

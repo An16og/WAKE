@@ -31,33 +31,44 @@
       </div>
     </header>
 
-    <!-- Main Active Chamber View -->
-    <main id="chamber-view" class="view-panel active">
-      <!-- 3D 1-bit Vector Room Canvas -->
-      <div class="viewport-card">
-        <div class="viewport-header">
-          <span id="room-title" class="room-title">LOCATION // BEDROOM</span>
-          <span id="ghost-status-badge" class="badge">GHOST: ONLINE</span>
+    <!-- Main Active Chamber View: Pure Cinematic Bandersnatch -->
+    <main id="chamber-view" class="view-panel active bandersnatch-main">
+      <!-- Status Bar -->
+      <div class="bandersnatch-top-info">
+        <span id="room-title" class="bs-info-item">LOCATION // BEDROOM</span>
+        <span id="distance-meter" class="bs-info-item">DISTANCE: [==========] 10/10</span>
+        <span id="ghost-status-badge" class="bs-info-item badge">GHOST: ONLINE</span>
+      </div>
+
+      <!-- Cinematic Viewport Area -->
+      <div class="bandersnatch-screen-frame">
+        <canvas id="room-canvas-3d" class="bandersnatch-canvas"></canvas>
+
+        <!-- Dynamic Subtitle (Netflix Bandersnatch Style) -->
+        <div id="scene-subtitle" class="bandersnatch-subtitle">
+          You wake drenched in cold sweat. Claws scrape behind the drywall.
         </div>
-        <canvas id="room-canvas-3d" class="room-canvas"></canvas>
-      </div>
 
-      <!-- Atmospheric Narrative Box & Minigame Arena -->
-      <div class="narrative-card">
-        <div id="narrative-output" class="narrative-text"></div>
-        <div id="minigame-arena" class="minigame-arena hidden"></div>
-      </div>
-
-      <!-- Quick Action Pills -->
-      <div class="action-bar-container">
-        <span class="action-label">AVAILABLE ACTIONS:</span>
-        <div id="action-pills" class="action-pills">
-          <!-- Populated dynamically: e.g. [look], [go north], [take key] -->
+        <!-- In-Image Reveal Overlay for Mirror Finale -->
+        <div id="image-overlay-reveal" class="image-overlay-reveal hidden">
+          <div class="reveal-line-main">IT WAS YOU ALL ALONG.</div>
+          <div class="reveal-line-sub">I WAS NEVER RUNNING FROM THE MONSTER. I AM THE THING.</div>
         </div>
       </div>
 
-      <!-- Centered Command Input Box -->
-      <div class="prompt-box">
+      <!-- 15-Second Reverse Progress Bar (No Counter, Just Clean Tense Shrinking Bar) -->
+      <div id="timer-track" class="bandersnatch-timer-track">
+        <div id="bandersnatch-timer-bar" class="bandersnatch-timer-fill" style="width: 100%;"></div>
+      </div>
+
+      <!-- Large Cinematic Choice Buttons -->
+      <div class="bandersnatch-controls-area">
+        <div id="bandersnatch-choices" class="bandersnatch-choices-row"></div>
+        <div id="action-pills" class="bandersnatch-actions-row"></div>
+      </div>
+
+      <!-- Discrete Minimalist CLI input -->
+      <div class="bandersnatch-input-container">
         <span class="prompt-arrow">&gt;</span>
         <input
           type="text"
@@ -65,17 +76,13 @@
           autofocus
           autocomplete="off"
           spellcheck="false"
-          placeholder="Type command or click an action above... (Tab to autocomplete)"
+          placeholder="Press A / B or click a choice above... (Tab for help)"
         />
       </div>
 
-      <!-- Footer Distance Tracker -->
-      <div class="cli-footer">
-        <div id="distance-meter" class="distance-meter">
-          DISTANCE TO THING: [==========] 10/10
-        </div>
-        <div class="sub-hints">Type 'help' for commands | Press ~ for Raw JSON</div>
-      </div>
+      <!-- Hidden containers for transcript compatibility -->
+      <div id="minigame-arena" class="hidden"></div>
+      <div id="narrative-output" class="hidden"></div>
     </main>
 
     <!-- Logs & Ghost Process View -->
