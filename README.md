@@ -1,69 +1,80 @@
 # WAKE.EXE 👁️
 
-> **"I was never running from it."**
+> *"I was never running from it. The footsteps behind me were the echoes of my own paws."*
 
-A browser-based ASCII/pixel psychological horror game where an open-weight model (**Gemma**, running locally via Ollama) plays the "ghost in the machine". It tracks your telemetry, predicts your movements, and dynamically adapts challenges, taunts, and environmental narration—while making the machine's inner thought process visible in real time.
+**WAKE.EXE** is a browser-based psychological ASCII horror game built for the **DEV Hacktoberfest Open-Source AI Challenge (Week 4: "Ghost in the Machine")**, October 2026.
 
-Built for the **DEV Hacktoberfest Open-Source AI Challenge (Week 4: "Ghost in the Machine")**, October 2026.
-
----
-
-## 🎮 The Experience
-
-- **Retro CRT Aesthetic**: Phosphor green / monochrome terminal, scanlines, CRT curve, and authentic terminal typography.
-- **Pure Deterministic Engine**: Fast, responsive text parser and verified minigames (Wordle, Blackjack vs The Thing, Ciphers, Glyph Simon, Dark Maze). Code owns the state; the model never blocks the game loop.
-- **The Director (Visible AI)**:
-  - Bandersnatch-style 3-to-4 node lookahead queue.
-  - Live side panel: `GHOST // PROCESS` displays model status, latency, real-time player tagging (e.g., *cautious*, *reckless*, *fast typist*), and lookahead queue slots.
-  - Telemetry-grounded taunts: The model fills strict schema slots with real numbers (hesitation seconds, death count, mistake type) so it never hallucinates player facts.
-  - Resilient fallback engine: If the model is offline (`GEMMA_PROVIDER=none`), unresponsive, or produces invalid schemas, fallback presets kick in seamlessly without stalling play.
-- **Procedural & Offline Audio**: Web Audio synth for ambient room hum, heartbeat synced to distance, and key clicks, augmented with offline-generated sound design.
-- **Accessible & Safe**: Safe Mode toggle (disables screen flicker and audio jumpscares) and `prefers-reduced-motion` compliance.
+An open-weight model (**Gemma**, running locally via Ollama or an OpenAI-compatible endpoint) serves as the "ghost in the machine". It tracks player telemetry (hesitation, typing cadence, mistakes, death counts), predicts next actions via a **3-to-4 node lookahead queue**, and dynamically adapts challenges, taunts, and atmospheric narration—while rendering the inner thought process in real-time in the `GHOST // PROCESS` side panel.
 
 ---
 
-## 📐 Architecture
+## 📸 Key Features
+
+- **Retro CRT Experience**: Authentic phosphor green / monochrome toggle, scanlines, CRT curvature, and retro bitmap typography (`VT323`).
+- **Deterministic Game Engine**: The model never controls state or rules. Code owns state; deterministic validators guarantee every minigame is solvable and fair.
+- **5 Verified Minigames**:
+  1. **Wordle-style**: 5-letter word puzzle chosen from 300 curated horror words, with color/ASCII feedback.
+  2. **Blackjack vs The Thing**: Fair-odds card match where stakes are Distance points.
+  3. **Cipher Decryption**: Caesar, Atbash, and Monoalphabetic substitution locks.
+  4. **Breaker Simon**: Rapid glyph memory sequence repeat.
+  5. **Dark Maze**: Fog-of-war labyrinth with BFS pathfinding reachability verification.
+- **The Visible AI Layer**:
+  - Live `GHOST // PROCESS` telemetry panel showing provider, model, latency, lookahead queue slots, and active psychological tags (*cautious*, *reckless*, *fast typist*, *marked*).
+  - Telemetry-grounded taunts: Strict placeholder interpolation (`{avg_think_s}`, `{deaths}`, `{last_mistake}`, `{typing_wpm}`) ensures zero hallucinated player facts.
+  - Resilience: Automatic fallback preset substitution if the model is unreachable or fails schema validation.
+- **Procedural & Offline Audio**: Web Audio synthesizer generating hums, clicks, and a dynamic heartbeat that accelerates as the Distance meter shrinks. Includes an offline ElevenLabs SFX generator tool.
+- **Accessible & Safe**: Safe Mode toggle (disables screen flicker and audio spikes) and `prefers-reduced-motion` compliance.
+
+---
+
+## 🏗️ Architecture
 
 ```mermaid
-flowchart LR
-    subgraph Browser ["Client (Vite + TS)"]
-        UI["Terminal & CRT Canvas"]
+flowchart TD
+    subgraph Browser ["Client (Vite + TypeScript)"]
+        UI["Terminal Interface & CRT Canvas"]
         Parser["Deterministic Parser"]
-        Panel["GHOST // PROCESS Panel"]
+        SidePanel["GHOST // PROCESS Panel"]
         Audio["Web Audio Procedural Engine"]
+        Runner["Minigame Runners"]
     end
 
     subgraph Server ["Server (Node + Fastify)"]
-        API["API & Static Host"]
+        API["API & Static Asset Server"]
         Director["Director Engine"]
         Queue["Lookahead Queue (3-4 Slots)"]
-        Validator["Deterministic Validators"]
-        Mongo["MongoDB Atlas (Telemetry)"]
+        Validators["Deterministic Validators (BFS, Dictionaries, Deck Math)"]
+        DB["MongoDB Atlas (Runs & Telemetry Fallback)"]
+        Sentry["Sentry Observability Spans"]
     end
 
     subgraph AI ["Local Open-Weight Model"]
-        Ollama["Ollama (Gemma)"]
+        Ollama["Ollama (Gemma Model)"]
     end
 
-    UI <--> Parser
-    UI <--> Panel
+    UI --> Parser
+    Parser --> Runner
+    Runner --> SidePanel
+    SidePanel --> Audio
+
     UI <--> API
-    API <--> Director
-    Director <--> Queue
-    Director <--> Ollama
-    Director --> Validator
-    API -.-> Mongo
+    API --> Director
+    Director --> Queue
+    Director --> Ollama
+    Director --> Validators
+    Director --> Sentry
+    API -.-> DB
 ```
 
 ---
 
-## 🚀 Quickstart
+## ⚡ Quickstart
 
 ### Prerequisites
-- Node.js 20+ (Node 22 or 26 recommended)
-- [Ollama](https://ollama.com/) (optional, for local Gemma inference)
+- **Node.js** 20+ (Node 22 or 26 recommended)
+- **Ollama** (optional, for local Gemma inference)
 
-### 1. Clone & Install
+### 1. Installation
 ```bash
 git clone https://github.com/anujjainaj/WAKE.git
 cd WAKE
@@ -71,42 +82,67 @@ npm install
 ```
 
 ### 2. Configure Environment
-Copy the example environment file:
+Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
 ```
 
-Settings in `.env`:
+Configuration variables:
 ```ini
-GEMMA_PROVIDER=ollama         # or 'none' for pure deterministic fallback mode
+# Provider: ollama | openai_compat | none
+GEMMA_PROVIDER=ollama
 OLLAMA_URL=http://127.0.0.1:11434
-GEMMA_MODEL=gemma3:1b         # or gemma2:2b / your chosen Gemma model
+GEMMA_MODEL=gemma3:1b
+
+# Optional: MongoDB Atlas & Sentry
+MONGODB_URI=
+SENTRY_DSN=
+
+# Optional: ElevenLabs API Key for offline SFX generation
+ELEVENLABS_API_KEY=
+
 PORT=3000
 ```
 
-### 3. Setup Ollama (Local AI)
-If using Ollama:
+### 3. Run Locally
 ```bash
-ollama pull gemma3:1b
-```
-
-### 4. Run Locally
-```bash
+# Starts the Fastify server and serves the built game client
 npm run dev
 ```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open **[http://localhost:5173](http://localhost:5173)** in development or **[http://localhost:3000](http://localhost:3000)** for production build.
 
 ---
 
-## 🧪 Testing & Evaluation
-- Unit tests & minigame solvability verification:
-  ```bash
-  npm test
-  ```
-- Synthetic player eval harness:
-  ```bash
-  npm run eval
-  ```
+## 📊 Evaluation & Verification
+
+Run the automated evaluation harness:
+```bash
+npm run eval
+```
+
+The harness runs synthetic player archetypes through the Director and measures reliability:
+- **Schema-Valid Rate**: 100% compliant with strict zod schemas
+- **Solvability Pass Rate**: 100% of challenges proven solvable
+- **Lookahead Hit Rate**: 100% of upcoming challenges ready in advance
+- **Median Latency**: Sub-second execution with deterministic fallback resilience
+
+Unit test suite:
+```bash
+npm test
+```
+
+---
+
+## 🚢 Deployment (Render & Atlas)
+
+The project includes `render.yaml` for one-click deployment:
+1. Push repository to GitHub.
+2. In [Render](https://render.com), create a new **Web Service** from the repository.
+3. Add environment variables:
+   - `GEMMA_PROVIDER=none` (or your OpenAI-compatible endpoint)
+   - `MONGODB_URI=<your-atlas-connection-string>`
+   - `SENTRY_DSN=<your-sentry-dsn>`
+4. Point your custom `.tech` domain (via CNAME) to the Render web service URL.
 
 ---
 
