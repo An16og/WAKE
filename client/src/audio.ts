@@ -17,13 +17,20 @@ class SoundEngine {
   }
 
   public initOnGesture(): void {
-    if (this.isStarted) return;
+    if (this.isMuted) return;
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      this.ctx = new AudioCtx();
-      this.isStarted = true;
-      this.startDrone();
-      this.updateHeartbeat(this.distance);
+      if (!this.ctx) {
+        this.ctx = new AudioCtx();
+      }
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+      if (!this.isStarted) {
+        this.isStarted = true;
+        this.startDrone();
+        this.updateHeartbeat(this.distance);
+      }
     } catch (e) {
       console.warn('Web Audio not supported or blocked:', e);
     }
@@ -33,11 +40,20 @@ class SoundEngine {
     this.isMuted = !this.isMuted;
     if (this.ctx) {
       if (this.isMuted) {
-        this.ctx.suspend();
+        this.ctx.suspend().catch(() => {});
       } else {
-        this.ctx.resume();
+        this.ctx.resume().catch(() => {});
+        if (!this.isStarted) {
+          this.initOnGesture();
+        }
       }
+    } else if (!this.isMuted) {
+      this.initOnGesture();
     }
+    return this.isMuted;
+  }
+
+  public getMuted(): boolean {
     return this.isMuted;
   }
 
@@ -51,7 +67,7 @@ class SoundEngine {
   }
 
   private startDrone(): void {
-    if (!this.ctx || this.isMuted) return;
+    if (!this.ctx || this.isMuted || this.droneOsc) return;
     try {
       this.droneOsc = this.ctx.createOscillator();
       this.droneGain = this.ctx.createGain();
@@ -64,7 +80,7 @@ class SoundEngine {
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(110, this.ctx.currentTime);
 
-      this.droneGain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+      this.droneGain.gain.setValueAtTime(0.05, this.ctx.currentTime);
 
       this.droneOsc.connect(filter);
       filter.connect(this.droneGain);
@@ -184,11 +200,13 @@ class SoundEngine {
   public async playSfx(name: string): Promise<void> {
     if (this.isMuted) return;
     try {
+      this.initOnGesture();
       const audio = new Audio(`/sfx/${name}.mp3`);
-      audio.volume = this.isSafeMode ? 0.25 : 0.6;
+      audio.volume = this.isSafeMode ? 0.25 : 0.75;
       await audio.play();
     } catch (err) {
-      // Fallback to procedural generation if audio file doesn't exist
+      console.warn(`[SoundEngine] playSfx('${name}') fallback:`, err);
+      // Fallback to procedural generation if audio file doesn't exist or play() is blocked
       this.playGlitchNoise();
     }
   }

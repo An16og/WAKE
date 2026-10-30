@@ -392,11 +392,12 @@ export class BandersnatchRunner {
     this.choices = state.params.choices || [];
     // If player has flashlight, gives +4 seconds bonus decision time!
     const bonus = state.inventory?.has('flashlight') ? 4 : 0;
-    // Standard Bandersnatch 15s decision window
-    this.timeLimitSec = (state.params.timeLimitSec || 15) + bonus;
+    // Standard Bandersnatch 15s minimum decision window (+ item bonus)
+    this.timeLimitSec = Math.max(15, (state.params.timeLimitSec || 15)) + bonus;
   }
 
   public start(): void {
+    soundEngine.playSfx('breath');
     this.timerBarEl = document.getElementById('bandersnatch-timer-bar');
     this.choicesContainerEl = document.getElementById('bandersnatch-choices');
     this.subtitleEl = document.getElementById('scene-subtitle');
@@ -467,6 +468,9 @@ export class BandersnatchRunner {
     this.cleanup();
     this.isResolved = true;
 
+    soundEngine.playKeyClick();
+
+    soundEngine.playSfx('death_sting');
     soundEngine.playGlitchNoise();
     if (this.subtitleEl) {
       this.subtitleEl.textContent = 'Time expired. Indecision has consequences... claws tear the silence!';
@@ -508,6 +512,8 @@ export class BandersnatchRunner {
 
     this.cleanup();
     this.isResolved = true;
+
+    soundEngine.playKeyClick();
 
     if (this.subtitleEl) {
       this.subtitleEl.textContent = choice.consequence;

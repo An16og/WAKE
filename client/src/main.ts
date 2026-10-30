@@ -101,7 +101,7 @@ let isQueueGenerating = false;
 // UI Settings
 let isMonochrome = false;
 let isSafeMode = false;
-let isAudioMuted = true;
+let isAudioMuted = false;
 let isDebugOpen = false;
 
 // Helper: Logging to history transcript
@@ -346,6 +346,17 @@ function enterRoom(roomId: string): void {
   doomRenderer.setRoom(roomId, true);
   roomTitleEl.textContent = `LOCATION // ${room.name}`;
 
+  // Atmospheric room audio effects
+  if (roomId === 'mirror_room') {
+    soundEngine.playSfx('whisper');
+  } else if (roomId === 'hallway' || roomId === 'corridor') {
+    soundEngine.playSfx('footsteps');
+  } else if (roomId === 'pantry' || roomId === 'basement') {
+    soundEngine.playSfx('breath');
+  } else {
+    soundEngine.playSfx('door_creak');
+  }
+
   clearNarrative();
   minigameArenaEl.innerHTML = '';
   minigameArenaEl.classList.add('hidden');
@@ -453,6 +464,8 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
 // Death & Respawn
 function triggerDeath(): void {
   deaths++;
+  soundEngine.playSfx('monster_growl');
+  setTimeout(() => soundEngine.playSfx('death_sting'), 300);
   soundEngine.playGlitchNoise();
   clearNarrative();
   const subtitleEl = document.getElementById('scene-subtitle');
@@ -492,29 +505,34 @@ async function triggerMirrorFinale(): Promise<void> {
   // Stage 0: Calm human reflection in mirror
   doomRenderer.setMirrorMorphStage(0);
   if (subtitleEl) subtitleEl.textContent = 'You look into the antique glass. Your reflection stares back in silence.';
+  soundEngine.playSfx('breath');
   soundEngine.playKeyClick();
   await new Promise((r) => setTimeout(r, 1400));
 
   // Stage 1: Corruption starts, horns sprout, zoom 1.35x
   doomRenderer.setMirrorMorphStage(1);
+  soundEngine.playSfx('whisper');
   soundEngine.playGlitchNoise();
   if (subtitleEl) subtitleEl.textContent = 'The reflection twitches... horns begin rising from your skull.';
   await new Promise((r) => setTimeout(r, 1400));
 
   // Stage 2: Fangs & Glass fractures, zoom 1.8x
   doomRenderer.setMirrorMorphStage(2);
+  soundEngine.playSfx('mirror_crack');
   soundEngine.playGlitchNoise();
   if (subtitleEl) subtitleEl.textContent = 'The glass cracks. The jaw splits open into snarling predator fangs.';
   await new Promise((r) => setTimeout(r, 1400));
 
   // Stage 3: Monster face fills mirror frame, zoom 2.3x
   doomRenderer.setMirrorMorphStage(3);
+  soundEngine.playSfx('monster_growl');
   soundEngine.playGlitchNoise();
   if (subtitleEl) subtitleEl.textContent = 'The footsteps behind me were my own paws. I was never running from the thing.';
   await new Promise((r) => setTimeout(r, 1600));
 
   // Stage 4: Glass shatters! Beast face enlarges to fill entire screen!
   doomRenderer.setMirrorMorphStage(4);
+  soundEngine.playSfx('death_sting');
   soundEngine.playGlitchNoise();
   await new Promise((r) => setTimeout(r, 800));
 
@@ -828,6 +846,7 @@ function triggerKonamiJumpscare(): void {
     if (jumpscareSubEl) {
       jumpscareSubEl.textContent = 'WHAT WATCHES YOU FROM THE MACHINE HAS YOUR FACE, YOUR TEETH, YOUR SINS.';
     }
+    soundEngine.playSfx('monster_growl');
     soundEngine.playGlitchNoise();
   }
 
@@ -969,11 +988,22 @@ safeModeToggleEl.addEventListener('click', () => {
   printNarrative(`Safe Mode is now ${isSafeMode ? 'ON (Suppressing flashes & jumpscares)' : 'OFF'}.`);
 });
 
-audioToggleEl.addEventListener('click', () => {
+audioToggleEl.addEventListener('click', (e) => {
+  e.stopPropagation();
   soundEngine.initOnGesture();
   isAudioMuted = soundEngine.toggleMute();
   audioToggleEl.textContent = isAudioMuted ? '[AUDIO: OFF]' : '[AUDIO: ON]';
 });
+
+// Auto-unlock Web Audio on first user interaction anywhere
+const unlockAudioOnGesture = () => {
+  if (!isAudioMuted) {
+    soundEngine.initOnGesture();
+  }
+};
+window.addEventListener('click', unlockAudioOnGesture, { passive: true });
+window.addEventListener('keydown', unlockAudioOnGesture, { passive: true });
+window.addEventListener('pointerdown', unlockAudioOnGesture, { passive: true });
 
 window.addEventListener('keydown', (e) => {
   if (e.key === '`' || e.key === '~') {

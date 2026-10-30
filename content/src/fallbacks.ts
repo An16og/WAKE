@@ -379,7 +379,7 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
     difficulty: 1,
     params: {
       scenario: 'Claws scrape behind the drywall. You see an unlatched iron bulkhead and a low crawlspace duct.',
-      timeLimitSec: 10,
+      timeLimitSec: 15,
       choices: [
         {
           id: 'choice-slam',
@@ -415,7 +415,7 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
     difficulty: 2,
     params: {
       scenario: 'The floorboards groan and begin to splinter. Ahead, high-voltage junction cables hang spit sparks over a flooded floor.',
-      timeLimitSec: 8,
+      timeLimitSec: 15,
       choices: [
         {
           id: 'choice-leap',
@@ -451,7 +451,7 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
     difficulty: 3,
     params: {
       scenario: 'The furnace groans at critical pressure. Black smoke pours through the grating. An emergency blow-off valve is stuck.',
-      timeLimitSec: 7,
+      timeLimitSec: 15,
       choices: [
         {
           id: 'choice-vent',
@@ -479,7 +479,7 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
     difficulty: 2,
     params: {
       scenario: 'At the grease-coated table sits the towering silhouette. It extends long segmented fingers. The basement stairs beckon beyond its hunched back.',
-      timeLimitSec: 8,
+      timeLimitSec: 15,
       choices: [
         {
           id: 'choice-topple',
@@ -515,7 +515,7 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
     difficulty: 1,
     params: {
       scenario: 'You open your eyes. Heavy claws drag beneath the floorboards under your bed. The hallway door is ajar.',
-      timeLimitSec: 10,
+      timeLimitSec: 15,
       choices: [
         {
           id: 'choice-bolt',
@@ -551,7 +551,7 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
     difficulty: 4,
     params: {
       scenario: 'The walls have turned into wet, twitching sinew. The footsteps behind you are clicking in exact rhythm with your own feet. Ahead lies the silver vault.',
-      timeLimitSec: 7,
+      timeLimitSec: 15,
       choices: [
         {
           id: 'choice-vault-dash',
@@ -579,7 +579,7 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
     difficulty: 3,
     params: {
       scenario: 'Inside the tight pantry, rotten cans tremble on the shelves. Outside, the creature sniffs the door gap. A bottle of ethanol rests on the top shelf.',
-      timeLimitSec: 8,
+      timeLimitSec: 15,
       choices: [
         {
           id: 'choice-drink',
