@@ -95,7 +95,7 @@ class SoundEngine {
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(110, this.ctx.currentTime);
 
-      this.droneGain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+      this.droneGain.gain.setValueAtTime(0.025, this.ctx.currentTime);
 
       this.droneOsc.connect(filter);
       filter.connect(this.droneGain);
@@ -114,7 +114,7 @@ class SoundEngine {
 
       // Master BGM Gain
       this.bgmGain = this.ctx.createGain();
-      this.bgmGain.gain.setValueAtTime(this.isSafeMode ? 0.025 : 0.05, now);
+      this.bgmGain.gain.setValueAtTime(this.isSafeMode ? 0.015 : 0.032, now);
 
       // Warm analog lowpass filter
       this.bgmFilter = this.ctx.createBiquadFilter();
@@ -243,10 +243,10 @@ class SoundEngine {
     if (!this.ctx || this.isMuted || this.ctx.state !== 'running') return;
     try {
       const now = this.ctx.currentTime;
-      // Lub
-      this.synthesizeThump(now, 75, 45, 0.12, 0.15);
+      // Lub (subtle, non-jarring low thuds)
+      this.synthesizeThump(now, 75, 45, 0.055, 0.15);
       // Dub (slightly quieter and delayed)
-      this.synthesizeThump(now + 0.14, 65, 40, 0.1, 0.1);
+      this.synthesizeThump(now + 0.14, 65, 40, 0.04, 0.1);
     } catch (e) {
       // ignore
     }
@@ -282,7 +282,7 @@ class SoundEngine {
       osc.frequency.setValueAtTime(1200 + Math.random() * 400, now);
       osc.frequency.exponentialRampToValueAtTime(200, now + 0.015);
 
-      gain.gain.setValueAtTime(0.02, now);
+      gain.gain.setValueAtTime(0.01, now);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.015);
 
       osc.connect(gain);
@@ -316,7 +316,7 @@ class SoundEngine {
       filter.Q.setValueAtTime(3, now);
 
       const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(this.isSafeMode ? 0.05 : 0.15, now);
+      gain.gain.setValueAtTime(this.isSafeMode ? 0.02 : 0.05, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
       noise.connect(filter);
@@ -324,6 +324,7 @@ class SoundEngine {
       gain.connect(this.ctx.destination);
 
       noise.start(now);
+      noise.stop(now + 0.15);
     } catch (e) {
       // ignore
     }
@@ -334,7 +335,7 @@ class SoundEngine {
     try {
       this.initOnGesture();
       const audio = new Audio(`/sfx/${name}.mp3`);
-      audio.volume = this.isSafeMode ? 0.25 : 0.75;
+      audio.volume = this.isSafeMode ? 0.12 : 0.32;
       await audio.play();
     } catch (err) {
       console.warn(`[SoundEngine] playSfx('${name}') fallback:`, err);

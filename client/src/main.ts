@@ -104,8 +104,12 @@ let isSafeMode = false;
 let isAudioMuted = false;
 let isDebugOpen = false;
 
+// Global gameplay history log for dossier export
+const sessionHistoryLogs: string[] = [];
+
 // Helper: Logging to history transcript
 function appendHistory(text: string, className = ''): void {
+  sessionHistoryLogs.push(text);
   const line = document.createElement('div');
   line.className = className;
   line.textContent = text;
@@ -555,7 +559,7 @@ function displayEndingFile(): void {
   printNarrative('       THE FILE IT KEPT ON YOU [FINAL DOSSIER]          ', 'bright');
   printNarrative('========================================================');
   printNarrative(`  SESSION ID:           ${sessionId}`);
-  printNarrative(`  ELAPSED TIME:         ${profile.totalPlayTimeMs / 1000}s`);
+  printNarrative(`  ELAPSED TIME:         ${(profile.totalPlayTimeMs / 1000).toFixed(1)}s`);
   printNarrative(`  TYPING SPEED:         ${profile.typingSpeedWpm} WPM`);
   printNarrative(`  AVG IDLE HESITATION:  ${profile.commandIdleTimeAvgMs}ms`);
   printNarrative(`  TOTAL DEATHS:         ${deaths}`);
@@ -566,12 +570,101 @@ function displayEndingFile(): void {
   printNarrative('  VERDICT: THE MACHINE REMEMBERS EVERYTHING YOU DID.');
   printNarrative('  THANK YOU FOR PLAYING WAKE.EXE.');
   printNarrative('========================================================\n');
+
+  // Surface the Replay & Save Gameplay controls
+  const endingControlsEl = document.getElementById('ending-controls');
+  if (endingControlsEl) {
+    endingControlsEl.classList.remove('hidden');
+  }
+}
+
+// Export Gameplay Log & Psychological Dossier as Downloadable Text File
+function exportSessionDossier(): void {
+  soundEngine.playKeyClick();
+  const profile = buildPlayerProfile();
+  const dossierContent = [
+    '========================================================================',
+    '                   WAKE.EXE // PSYCHOLOGICAL DOSSIER',
+    '                 Created by Anuj Jain (github.com/An16og)',
+    '========================================================================',
+    `SESSION ID:            ${sessionId}`,
+    `TIMESTAMP:             ${new Date().toISOString()}`,
+    `PLAYTIME:              ${(profile.totalPlayTimeMs / 1000).toFixed(1)}s`,
+    `TYPING PACE:           ${profile.typingSpeedWpm} WPM`,
+    `AVERAGE HESITATION:    ${profile.commandIdleTimeAvgMs}ms`,
+    `DEATHS EXPERIENCED:    ${deaths}`,
+    `MISTAKES RECORDED:     ${mistakes}`,
+    `ROOMS REVISITED:       ${roomsRevisited}`,
+    `ASSIGNED PROFILE TAGS: ${profile.tags.join(', ')}`,
+    '',
+    'PSYCHOLOGICAL VERDICT:',
+    '  The machine observed every hesitation, every panic retreat, and every choice.',
+    '  You were never running from the monster.',
+    '  You are the thing.',
+    '========================================================================',
+    '                         GAMEPLAY TRANSCRIPT LOG',
+    '========================================================================',
+    ...sessionHistoryLogs,
+    '========================================================================',
+    '                       [END OF DOSSIER TRANSMISSION]',
+    '========================================================================'
+  ].join('\n');
+
+  const blob = new Blob([dossierContent], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `WAKE_DOSSIER_${sessionId}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  printNarrative(`[GAMEPLAY DOSSIER EXPORTED: WAKE_DOSSIER_${sessionId}.txt]`, 'bright');
+}
+
+// Reset Simulation & Awaken Again
+function restartGame(): void {
+  soundEngine.playKeyClick();
+  soundEngine.playSfx('breath');
+
+  deaths = 0;
+  mistakes = 0;
+  roomsRevisited = 0;
+  distance = 10;
+  updateDistance(10);
+  inventory.clear();
+  solvedRooms.clear();
+  visitedRooms.clear();
+  isEndingPlayed = false;
+
+  // Reset visual & UI state
+  doomRenderer.setMirrorMorphStage(0);
+  const overlayEl = document.getElementById('image-overlay-reveal');
+  if (overlayEl) overlayEl.classList.add('hidden');
+  const endingControlsEl = document.getElementById('ending-controls');
+  if (endingControlsEl) endingControlsEl.classList.add('hidden');
+  if (actionPillsEl) actionPillsEl.classList.remove('hidden');
+
+  enterRoom('bedroom');
+  printNarrative('========================================================', 'bright');
+  printNarrative('SIMULATION REBOOTED. AWAKENING IN THE BEDROOM...', 'bright');
+  printNarrative('========================================================\n');
 }
 
 // Command Handler
 function handleCommand(raw: string): void {
   if (isEndingPlayed) {
-    printNarrative('Session concluded. Reload to awaken again.');
+    const clean = raw.trim().toLowerCase();
+    if (clean === 'replay' || clean === 'restart' || clean === 'again') {
+      restartGame();
+      return;
+    }
+    if (clean === 'save' || clean === 'export' || clean === 'download') {
+      exportSessionDossier();
+      return;
+    }
+    printNarrative('Session concluded. Click [REPLAY SIMULATION] or [SAVE GAMEPLAY], or type "replay" / "save".');
     return;
   }
 
@@ -1027,6 +1120,18 @@ window.addEventListener('keydown', (e) => {
 closeDebugBtn.addEventListener('click', () => {
   isDebugOpen = false;
   debugModalEl.classList.add('hidden');
+});
+
+// End-Game Controls: Replay Simulation & Save Gameplay
+const btnReplay = document.getElementById('btn-replay');
+const btnSaveLog = document.getElementById('btn-save-log');
+
+btnReplay?.addEventListener('click', () => {
+  restartGame();
+});
+
+btnSaveLog?.addEventListener('click', () => {
+  exportSessionDossier();
 });
 
 boot();

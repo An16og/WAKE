@@ -17,7 +17,8 @@ const SFX_PROMPTS: Record<string, string> = {
   breath: 'Shallow ragged human breathing in cold damp darkness',
   mirror_crack: 'Sudden sharp mirror glass cracking and fracturing loudly',
   monster_growl: 'Deep low guttural monster throat rumble vibration',
-  death_sting: 'Harsh discordant horror musical sting impact'
+  death_sting: 'Harsh discordant horror musical sting impact',
+  bgm: 'Continuous low ominous psychological horror dark ambient soundtrack loop with subtle slow bass drone and distant eerie music chime'
 };
 
 const OUTPUT_DIR = path.resolve(__dirname, '../../client/public/sfx');
@@ -59,7 +60,7 @@ async function generateSfx() {
         },
         body: JSON.stringify({
           text: prompt,
-          duration_seconds: 2.5,
+          duration_seconds: name === 'bgm' ? 10.0 : 2.5,
           prompt_influence: 0.5
         })
       });
