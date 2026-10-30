@@ -51,6 +51,20 @@ const profileTagsEl = document.getElementById('profile-tags') as HTMLElement;
 const queueSlotsEl = document.getElementById('queue-slots') as HTMLElement;
 const learningFeedEl = document.getElementById('learning-feed') as HTMLElement;
 
+// Logs sub-navigation & timeline elements
+const viewModeTimelineBtn = document.getElementById('view-mode-timeline') as HTMLButtonElement;
+const viewModeTerminalBtn = document.getElementById('view-mode-terminal') as HTMLButtonElement;
+const btnExportDossierTab = document.getElementById('btn-export-dossier-tab') as HTMLButtonElement;
+const timelineViewPane = document.getElementById('timeline-view-pane') as HTMLElement;
+const rawTerminalPane = document.getElementById('raw-terminal-pane') as HTMLElement;
+const timelineEventsListEl = document.getElementById('timeline-events-list') as HTMLElement;
+
+// Live psychological dossier elements
+const statHesitationEl = document.getElementById('stat-hesitation');
+const statWpmEl = document.getElementById('stat-wpm');
+const statDeathsMistakesEl = document.getElementById('stat-deaths-mistakes');
+const statRoomsExploredEl = document.getElementById('stat-rooms-explored');
+
 // Controls
 const themeToggleEl = document.getElementById('theme-toggle') as HTMLElement;
 const safeModeToggleEl = document.getElementById('safe-mode-toggle') as HTMLElement;
@@ -117,6 +131,62 @@ function appendHistory(text: string, className = ''): void {
   terminalHistoryEl.scrollTop = terminalHistoryEl.scrollHeight;
 }
 
+interface TimelineEvent {
+  timestamp: string;
+  type: 'room' | 'choice' | 'item' | 'death' | 'mistake';
+  title: string;
+  detail?: string;
+}
+
+const timelineEvents: TimelineEvent[] = [];
+
+function recordTimelineEvent(type: 'room' | 'choice' | 'item' | 'death' | 'mistake', title: string, detail?: string): void {
+  const d = new Date();
+  const timeStr = [
+    String(d.getHours()).padStart(2, '0'),
+    String(d.getMinutes()).padStart(2, '0'),
+    String(d.getSeconds()).padStart(2, '0')
+  ].join(':');
+
+  const ev: TimelineEvent = { timestamp: timeStr, type, title, detail };
+  timelineEvents.push(ev);
+
+  if (timelineEventsListEl) {
+    const card = document.createElement('div');
+    card.className = `timeline-card type-${type}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'timeline-meta';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'timeline-time';
+    timeSpan.textContent = `[${timeStr}]`;
+
+    const badgeSpan = document.createElement('span');
+    badgeSpan.className = 'timeline-badge';
+    badgeSpan.textContent = type.toUpperCase();
+
+    meta.appendChild(timeSpan);
+    meta.appendChild(badgeSpan);
+
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'timeline-title';
+    titleDiv.textContent = title;
+
+    card.appendChild(meta);
+    card.appendChild(titleDiv);
+
+    if (detail) {
+      const detailDiv = document.createElement('div');
+      detailDiv.className = 'timeline-detail';
+      detailDiv.textContent = detail;
+      card.appendChild(detailDiv);
+    }
+
+    timelineEventsListEl.prepend(card);
+  }
+}
+
 // Helper: Output to active narrative card
 function printNarrative(text: string, className = ''): void {
   const line = document.createElement('div');
@@ -150,6 +220,7 @@ function recordMistake(penalty: number, mistakeName: string): void {
   updateDistance(distance - penalty);
   postTelemetry('mistake', { mistakeName, penalty, distanceRemaining: distance });
   addLearningFeed(`> Mistake registered: ${mistakeName} (Distance -${penalty})`);
+  recordTimelineEvent('mistake', `MISTAKE: ${mistakeName.toUpperCase()}`, `Penalty applied: -${penalty} Distance`);
   recalculateProfileAndTags();
   triggerDirectorLookahead();
 }
@@ -201,13 +272,20 @@ function buildPlayerProfile(): PlayerProfile {
 
 function recalculateProfileAndTags(): void {
   const profile = buildPlayerProfile();
-  profileTagsEl.innerHTML = '';
-  for (const t of profile.tags) {
-    const span = document.createElement('span');
-    span.className = 'tag';
-    span.textContent = t;
-    profileTagsEl.appendChild(span);
+  if (profileTagsEl) {
+    profileTagsEl.innerHTML = '';
+    for (const t of profile.tags) {
+      const span = document.createElement('span');
+      span.className = 'tag';
+      span.textContent = t;
+      profileTagsEl.appendChild(span);
+    }
   }
+
+  if (statHesitationEl) statHesitationEl.textContent = `${profile.commandIdleTimeAvgMs}ms`;
+  if (statWpmEl) statWpmEl.textContent = `${profile.typingSpeedWpm} WPM`;
+  if (statDeathsMistakesEl) statDeathsMistakesEl.textContent = `${deaths} / ${mistakes}`;
+  if (statRoomsExploredEl) statRoomsExploredEl.textContent = `${visitedRooms.size} / 8 LOCATIONS`;
 }
 
 // Lookahead Queue UI
@@ -361,6 +439,8 @@ function enterRoom(roomId: string): void {
     soundEngine.playSfx('door_creak');
   }
 
+  recordTimelineEvent('room', `EXPLORATION: ${room.name.toUpperCase()}`, room.narration[0] || 'Awakened in silence');
+
   clearNarrative();
   minigameArenaEl.innerHTML = '';
   minigameArenaEl.classList.add('hidden');
@@ -434,6 +514,9 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
     onDistanceChange: (delta: number) => {
       updateDistance(distance + delta);
     },
+    onChoiceMade: (label: string, consequence: string) => {
+      recordTimelineEvent('choice', `CHOICE: ${label}`, consequence);
+    },
     print: (txt: string, cls?: string) => {
       const line = document.createElement('div');
       if (cls) line.className = cls;
@@ -468,6 +551,7 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
 // Death & Respawn
 function triggerDeath(): void {
   deaths++;
+  recordTimelineEvent('death', 'THE THING CAUGHT YOU IN THE DARK', `Checkpoint reset to [${STORY_ROOMS[checkpointRoomId].name}]`);
   soundEngine.playSfx('monster_growl');
   setTimeout(() => soundEngine.playSfx('death_sting'), 300);
   soundEngine.playGlitchNoise();
@@ -718,6 +802,7 @@ function handleCommand(raw: string): void {
       if (itemIndex >= 0) {
         room.items.splice(itemIndex, 1);
         inventory.add(parsed.item);
+        recordTimelineEvent('item', `ACQUIRED: ${parsed.item.toUpperCase()}`, 'Added to neural inventory');
         printNarrative(`Taken: ${parsed.item}.`);
         renderActionPills(room);
       } else {
@@ -1013,6 +1098,29 @@ tabLogsBtn.addEventListener('click', () => {
   tabChamberBtn.classList.remove('active');
   logsViewEl.classList.remove('hidden');
   chamberViewEl.classList.add('hidden');
+  recalculateProfileAndTags();
+  soundEngine.playKeyClick();
+});
+
+// Logs Sub-Navigation (Story Timeline vs Raw Terminal Stream)
+viewModeTimelineBtn?.addEventListener('click', () => {
+  viewModeTimelineBtn.classList.add('active');
+  viewModeTerminalBtn.classList.remove('active');
+  timelineViewPane?.classList.remove('hidden');
+  rawTerminalPane?.classList.add('hidden');
+  soundEngine.playKeyClick();
+});
+
+viewModeTerminalBtn?.addEventListener('click', () => {
+  viewModeTerminalBtn.classList.add('active');
+  viewModeTimelineBtn.classList.remove('active');
+  rawTerminalPane?.classList.remove('hidden');
+  timelineViewPane?.classList.add('hidden');
+  soundEngine.playKeyClick();
+});
+
+btnExportDossierTab?.addEventListener('click', () => {
+  exportSessionDossier();
 });
 
 // Boot & Init

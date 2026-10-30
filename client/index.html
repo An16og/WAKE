@@ -101,38 +101,83 @@
 
     <!-- Logs & Ghost Process View -->
     <section id="logs-view" class="view-panel hidden">
+      <!-- Purpose & Action Sub-header Bar -->
+      <div class="logs-header-bar">
+        <div class="logs-purpose">
+          <span class="purpose-title">&gt;&gt; ARCHIVE &amp; TELEMETRY //</span>
+          <span class="purpose-desc">Tracking player decisions, behavioral profiling, and Gemma lookahead execution.</span>
+        </div>
+        <div class="logs-actions">
+          <div class="view-switch-group">
+            <button id="view-mode-timeline" class="subtab-btn active">[ STORY TIMELINE ]</button>
+            <button id="view-mode-terminal" class="subtab-btn">[ RAW STREAM ]</button>
+          </div>
+          <button id="btn-export-dossier-tab" class="subtab-btn action-btn">[ 💾 EXPORT DOSSIER ]</button>
+        </div>
+      </div>
+
       <div class="logs-grid">
-        <!-- Full Terminal History -->
+        <!-- Main Column: Decision Timeline or Terminal Output -->
         <div class="terminal-history-pane">
-          <div class="pane-header">TRANSCRIPT LOGS</div>
-          <div id="terminal-history-output" class="history-content"></div>
+          <!-- Timeline View (Formatted Cards) -->
+          <div id="timeline-view-pane" class="timeline-container">
+            <div class="pane-header">CHRONOLOGICAL DECISION TIMELINE</div>
+            <div id="timeline-events-list" class="timeline-list">
+              <!-- Dynamically populated cards -->
+            </div>
+          </div>
+
+          <!-- Raw Terminal Stream View (Initially Hidden) -->
+          <div id="raw-terminal-pane" class="raw-terminal-container hidden">
+            <div class="pane-header">RAW TRANSCRIPT LOGS</div>
+            <div id="terminal-history-output" class="history-content"></div>
+          </div>
         </div>
 
-        <!-- Ghost Process & Lookahead Queue Telemetry -->
+        <!-- Telemetry & Ghost Engine Telemetry Column -->
         <aside class="ghost-telemetry-pane">
-          <div class="pane-header">GHOST // NEURAL PROCESS</div>
-          
-          <div class="telemetry-block">
-            <div class="stat-line"><span class="k">PROVIDER:</span> <span id="ghost-provider" class="v">OLLAMA</span></div>
-            <div class="stat-line"><span class="k">MODEL:</span> <span id="ghost-model" class="v">GEMMA</span></div>
-            <div class="stat-line"><span class="k">LATENCY:</span> <span id="ghost-latency" class="v">0ms</span></div>
+          <!-- Live Psychological Dossier -->
+          <div class="telemetry-card">
+            <div class="pane-header">PLAYER PSYCHOLOGICAL DOSSIER</div>
+            <div class="telemetry-block">
+              <div class="stat-line"><span class="k">HESITATION (AVG):</span> <span id="stat-hesitation" class="v">0ms</span></div>
+              <div class="stat-line"><span class="k">TYPING PACE:</span> <span id="stat-wpm" class="v">0 WPM</span></div>
+              <div class="stat-line"><span class="k">DEATHS / MISTAKES:</span> <span id="stat-deaths-mistakes" class="v">0 / 0</span></div>
+              <div class="stat-line"><span class="k">CARTOGRAPHY:</span> <span id="stat-rooms-explored" class="v">1 / 8 LOCATIONS</span></div>
+            </div>
+            <div class="profile-tags-section">
+              <div class="sub-label">BEHAVIORAL TAGS:</div>
+              <div id="profile-tags" class="profile-tags">
+                <span class="tag">CALIBRATING</span>
+              </div>
+            </div>
           </div>
 
-          <div class="pane-header sub">LOOKAHEAD QUEUE</div>
-          <div id="queue-slots" class="queue-slots">
-            <div class="queue-slot empty">[SLOT 1] PENDING</div>
-            <div class="queue-slot empty">[SLOT 2] PENDING</div>
-            <div class="queue-slot empty">[SLOT 3] PENDING</div>
+          <!-- AI Lookahead Engine Telemetry -->
+          <div class="telemetry-card">
+            <div class="pane-header">NEURAL LOOKAHEAD ENGINE</div>
+            <div class="telemetry-block mini">
+              <div class="stat-line"><span class="k">PROVIDER:</span> <span id="ghost-provider" class="v">OLLAMA</span></div>
+              <div class="stat-line"><span class="k">MODEL:</span> <span id="ghost-model" class="v">GEMMA</span></div>
+              <div class="stat-line"><span class="k">LATENCY:</span> <span id="ghost-latency" class="v">0ms</span></div>
+            </div>
+            <div class="card-explainer">
+              The local model generates 3 steps ahead into cache so dilemma choices load instantly.
+            </div>
+            <div id="queue-slots" class="queue-slots">
+              <div class="queue-slot empty">[SLOT 1] PENDING</div>
+              <div class="queue-slot empty">[SLOT 2] PENDING</div>
+              <div class="queue-slot empty">[SLOT 3] PENDING</div>
+            </div>
           </div>
 
-          <div class="pane-header sub">PLAYER PROFILE TAGS</div>
-          <div id="profile-tags" class="profile-tags">
-            <span class="tag">CALIBRATING</span>
-          </div>
-
-          <div class="pane-header sub">NEURAL LEARNING FEED</div>
-          <div id="learning-feed" class="learning-feed">
-            <div class="feed-item">&gt; Listening on memory bus...</div>
+          <!-- Neural Learning & Adaptation Feed -->
+          <div class="telemetry-card feed-card">
+            <div class="pane-header">OBSERVER REASONING FEED</div>
+            <div class="card-explainer">Live neural event bus adapting horror parameters to your behavior:</div>
+            <div id="learning-feed" class="learning-feed">
+              <div class="feed-item">&gt; Neural observer initialized...</div>
+            </div>
           </div>
         </aside>
       </div>
