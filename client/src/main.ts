@@ -1,4 +1,4 @@
-// WAKE.EXE - Master Game Engine & Director-Driven Terminal Client
+// WAKE.EXE - Master Game Engine, 3D Vector Viewport & Minimalist Centered Terminal Client
 import {
   parseCommand,
   getAutocompleteSuggestions,
@@ -7,7 +7,6 @@ import {
 } from '@wake/shared';
 import {
   STORY_ROOMS,
-  ROOM_ART,
   TITLE_ART,
   DEATH_ART,
   MIRROR_MORPH_FRAMES,
@@ -22,6 +21,7 @@ import {
   MinigameState
 } from './minigames/runners.js';
 import { soundEngine } from './audio.js';
+import { RoomRenderer3D } from './canvas3d.js';
 
 interface HealthData {
   status: 'ok' | 'degraded' | 'error';
@@ -33,16 +33,30 @@ interface HealthData {
 }
 
 // DOM Elements
-const outputEl = document.getElementById('terminal-output') as HTMLDivElement;
+const chamberViewEl = document.getElementById('chamber-view') as HTMLElement;
+const logsViewEl = document.getElementById('logs-view') as HTMLElement;
+const tabChamberBtn = document.getElementById('tab-chamber-btn') as HTMLButtonElement;
+const tabLogsBtn = document.getElementById('tab-logs-btn') as HTMLButtonElement;
+
+const roomCanvasEl = document.getElementById('room-canvas-3d') as HTMLCanvasElement;
+const roomTitleEl = document.getElementById('room-title') as HTMLElement;
+const ghostStatusBadgeEl = document.getElementById('ghost-status-badge') as HTMLElement;
+const narrativeOutputEl = document.getElementById('narrative-output') as HTMLDivElement;
+const minigameArenaEl = document.getElementById('minigame-arena') as HTMLDivElement;
+const actionPillsEl = document.getElementById('action-pills') as HTMLDivElement;
 const inputEl = document.getElementById('terminal-input') as HTMLInputElement;
 const distanceMeterEl = document.getElementById('distance-meter') as HTMLElement;
+
+// Logs tab elements
+const terminalHistoryEl = document.getElementById('terminal-history-output') as HTMLDivElement;
 const ghostProviderEl = document.getElementById('ghost-provider') as HTMLElement;
 const ghostModelEl = document.getElementById('ghost-model') as HTMLElement;
-const ghostStatusEl = document.getElementById('ghost-status') as HTMLElement;
 const ghostLatencyEl = document.getElementById('ghost-latency') as HTMLElement;
 const profileTagsEl = document.getElementById('profile-tags') as HTMLElement;
 const queueSlotsEl = document.getElementById('queue-slots') as HTMLElement;
 const learningFeedEl = document.getElementById('learning-feed') as HTMLElement;
+
+// Controls
 const themeToggleEl = document.getElementById('theme-toggle') as HTMLElement;
 const safeModeToggleEl = document.getElementById('safe-mode-toggle') as HTMLElement;
 const audioToggleEl = document.getElementById('audio-toggle') as HTMLElement;
@@ -52,6 +66,9 @@ const debugJsonEl = document.getElementById('debug-json') as HTMLElement;
 const jumpscareOverlayEl = document.getElementById('jumpscare-overlay') as HTMLElement;
 const jumpscareArtEl = document.getElementById('jumpscare-art') as HTMLElement;
 const jumpscareTextEl = document.getElementById('jumpscare-text') as HTMLElement;
+
+// 3D Canvas Visualizer
+const renderer3d = new RoomRenderer3D(roomCanvasEl);
 
 // Konami Code Tracker
 const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
@@ -85,36 +102,45 @@ let isEndingPlayed = false;
 let lookaheadQueue: ChallengeItem[] = [];
 let isQueueGenerating = false;
 
-// UI State
+// UI Settings
 let isMonochrome = false;
 let isSafeMode = false;
 let isAudioMuted = true;
 let isDebugOpen = false;
 
-// Output formatting
-function printLine(text: string, className = ''): void {
+// Helper: Logging to history transcript
+function appendHistory(text: string, className = ''): void {
   const line = document.createElement('div');
   line.className = className;
   line.textContent = text;
-  outputEl.appendChild(line);
-  outputEl.scrollTop = outputEl.scrollHeight;
+  terminalHistoryEl.appendChild(line);
+  terminalHistoryEl.scrollTop = terminalHistoryEl.scrollHeight;
 }
 
-function printArt(lines: string[], className = ''): void {
-  for (const l of lines) {
-    printLine(l, className);
-  }
-}
-
-async function typeWriter(text: string, speed = 12): Promise<void> {
+// Helper: Output to active narrative card
+function printNarrative(text: string, className = ''): void {
   const line = document.createElement('div');
-  outputEl.appendChild(line);
+  line.className = className;
+  line.textContent = text;
+  narrativeOutputEl.appendChild(line);
+  narrativeOutputEl.scrollTop = narrativeOutputEl.scrollHeight;
+  appendHistory(text, className);
+}
+
+function clearNarrative(): void {
+  narrativeOutputEl.innerHTML = '';
+}
+
+async function typeWriterNarrative(text: string, speed = 10): Promise<void> {
+  const line = document.createElement('div');
+  narrativeOutputEl.appendChild(line);
   for (let i = 0; i < text.length; i++) {
     line.textContent += text[i];
-    outputEl.scrollTop = outputEl.scrollHeight;
+    narrativeOutputEl.scrollTop = narrativeOutputEl.scrollHeight;
     soundEngine.playKeyClick();
     await new Promise((r) => setTimeout(r, speed));
   }
+  appendHistory(text);
 }
 
 // Distance Meter
@@ -135,7 +161,7 @@ function recordMistake(penalty: number, mistakeName: string): void {
   mistakes++;
   updateDistance(distance - penalty);
   postTelemetry('mistake', { mistakeName, penalty, distanceRemaining: distance });
-  addLearningFeed(`> Mistake noted: ${mistakeName} (Distance -${penalty})`);
+  addLearningFeed(`> Mistake registered: ${mistakeName} (Distance -${penalty})`);
   recalculateProfileAndTags();
   triggerDirectorLookahead();
 }
@@ -145,7 +171,7 @@ function addLearningFeed(msg: string): void {
   item.className = 'feed-item';
   item.textContent = msg;
   learningFeedEl.prepend(item);
-  if (learningFeedEl.children.length > 8) {
+  if (learningFeedEl.children.length > 10) {
     learningFeedEl.removeChild(learningFeedEl.lastChild!);
   }
 }
@@ -196,7 +222,7 @@ function recalculateProfileAndTags(): void {
   }
 }
 
-// Lookahead Queue UI Updater
+// Lookahead Queue UI
 function renderQueueSlots(): void {
   queueSlotsEl.innerHTML = '';
   for (let i = 0; i < 3; i++) {
@@ -207,16 +233,16 @@ function renderQueueSlots(): void {
       slotDiv.textContent = `[SLOT ${i + 1}] ${ch.template.toUpperCase()} (LVL ${ch.difficulty}) [READY]`;
     } else if (isQueueGenerating) {
       slotDiv.className = 'queue-slot generating';
-      slotDiv.textContent = `[SLOT ${i + 1}] NEURAL SYNAPSE COMPUTING...`;
+      slotDiv.textContent = `[SLOT ${i + 1}] NEURAL MODEL SYNTHESIZING...`;
     } else {
       slotDiv.className = 'queue-slot empty';
-      slotDiv.textContent = `[SLOT ${i + 1}] PREPARING NEXT WAVE`;
+      slotDiv.textContent = `[SLOT ${i + 1}] QUEUED (AWAITING GENERATION)`;
     }
     queueSlotsEl.appendChild(slotDiv);
   }
 }
 
-// Background Director Invocation
+// Background Director Generation
 async function triggerDirectorLookahead(): Promise<void> {
   if (isQueueGenerating) return;
   isQueueGenerating = true;
@@ -251,7 +277,7 @@ async function triggerDirectorLookahead(): Promise<void> {
 
       if (data.response?.taunts && data.response.taunts.length > 0) {
         const taunt = data.response.taunts[Math.floor(Math.random() * data.response.taunts.length)];
-        addLearningFeed(`> Taunt prepared: "${taunt}"`);
+        addLearningFeed(`> Monster Taunt Prepared: "${taunt}"`);
       }
     }
   } catch (err: any) {
@@ -262,7 +288,56 @@ async function triggerDirectorLookahead(): Promise<void> {
   }
 }
 
-// Room Display Engine
+// Render Available Action Pills
+function renderActionPills(room: any): void {
+  actionPillsEl.innerHTML = '';
+
+  // Exits
+  for (const exit of room.exits) {
+    const pill = document.createElement('button');
+    pill.className = 'action-pill';
+    const status = exit.locked && !solvedRooms.has(room.id) ? ' [LOCKED]' : '';
+    pill.textContent = `go ${exit.direction}${status}`;
+    pill.addEventListener('click', () => {
+      inputEl.value = `go ${exit.direction}`;
+      handleCommand(`go ${exit.direction}`);
+    });
+    actionPillsEl.appendChild(pill);
+  }
+
+  // Items in room
+  if (room.items) {
+    for (const it of room.items) {
+      const pill = document.createElement('button');
+      pill.className = 'action-pill';
+      pill.textContent = `take ${it}`;
+      pill.addEventListener('click', () => {
+        inputEl.value = `take ${it}`;
+        handleCommand(`take ${it}`);
+      });
+      actionPillsEl.appendChild(pill);
+    }
+  }
+
+  // Common quick actions
+  const lookPill = document.createElement('button');
+  lookPill.className = 'action-pill';
+  lookPill.textContent = room.id === 'mirror_room' ? 'look mirror' : 'look';
+  lookPill.addEventListener('click', () => {
+    handleCommand(room.id === 'mirror_room' ? 'look mirror' : 'look');
+  });
+  actionPillsEl.appendChild(lookPill);
+
+  if (inventory.has('ethanol')) {
+    const ethPill = document.createElement('button');
+    ethPill.className = 'action-pill';
+    ethPill.textContent = 'use ethanol';
+    ethPill.addEventListener('click', () => handleCommand('use ethanol'));
+    actionPillsEl.appendChild(ethPill);
+  }
+}
+
+// Room Transition and Entry
 function enterRoom(roomId: string): void {
   const room = STORY_ROOMS[roomId];
   if (!room) return;
@@ -278,64 +353,50 @@ function enterRoom(roomId: string): void {
     checkpointRoomId = roomId;
   }
 
-  printLine('\n========================================================', 'bright');
-  printLine(`  LOCATION: [${room.name}]`, 'bright');
-  printLine('========================================================\n');
+  // 3D Camera Forward Transition
+  renderer3d.setRoom(roomId, true);
+  roomTitleEl.textContent = `LOCATION // ${room.name}`;
 
-  if (ROOM_ART[roomId]) {
-    printArt(ROOM_ART[roomId]);
-    printLine('');
-  }
+  clearNarrative();
+  minigameArenaEl.innerHTML = '';
+  minigameArenaEl.classList.add('hidden');
 
-  // Narration blending
+  // Narrative blending (2nd person -> 1st person)
   const roomSequence = ['bedroom', 'hallway', 'kitchen', 'pantry', 'stairwell', 'basement', 'corridor', 'mirror_room'];
   const driftIndex = roomSequence.indexOf(roomId);
 
   if (driftIndex >= 5) {
     for (const line of room.firstPersonDrift) {
-      printLine(line);
+      printNarrative(line);
     }
   } else {
     for (const line of room.narration) {
-      printLine(line);
+      printNarrative(line);
     }
   }
 
-  // If director had a taunt ready and distance is getting close, whisper it
+  // Director whisper taunt if distance is close
   if (lastDirectorData?.response?.taunts?.length && distance <= 6 && Math.random() > 0.4) {
     const taunt = lastDirectorData.response.taunts[0];
-    printLine(`\nWhisper behind your ear: "${taunt}"`, 'danger');
+    printNarrative(`\nA cold whisper touches the back of your skull: "${taunt}"`, 'danger');
   }
 
+  // Check if room challenge exists and unsolved
   if (room.challengeTemplate && !solvedRooms.has(roomId)) {
     startRoomChallenge(room.challengeTemplate, room.defaultChallengeId);
   } else {
-    printRoomExits(room);
+    renderActionPills(room);
   }
 
   syncState();
   recalculateProfileAndTags();
-  // Trigger director background generation for upcoming rooms!
   triggerDirectorLookahead();
 }
 
-function printRoomExits(room: any): void {
-  printLine('\nOBVIOUS EXITS:');
-  for (const exit of room.exits) {
-    const targetRoom = STORY_ROOMS[exit.targetRoomId];
-    const status = exit.locked && !solvedRooms.has(room.id) ? '[LOCKED]' : '[OPEN]';
-    printLine(`  - ${exit.direction.toUpperCase()} -> ${targetRoom?.name || exit.targetRoomId} ${status}`);
-  }
-  if (room.items && room.items.length > 0) {
-    printLine(`ITEMS HERE: ${room.items.join(', ')}`);
-  }
-}
-
-// Challenge Launcher (Uses Lookahead Queue when available!)
+// Start Room Minigame
 function startRoomChallenge(template: string, defaultChallengeId?: string): void {
   let challengeToRun: ChallengeItem | null = null;
 
-  // Check if lookahead queue has a matching or adapted challenge ready
   if (lookaheadQueue.length > 0) {
     const matchIdx = lookaheadQueue.findIndex((c) => c.template === template);
     if (matchIdx >= 0) {
@@ -347,7 +408,6 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
     renderQueueSlots();
   }
 
-  // Fallback to static pool if lookahead queue was empty
   if (!challengeToRun) {
     challengeToRun = FALLBACK_CHALLENGES.find((c) => c.id === defaultChallengeId) ||
       FALLBACK_CHALLENGES.find((c) => c.template === template) ||
@@ -355,16 +415,26 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
     addLearningFeed(`> Lookahead fallback: Delivered static ${template}`);
   }
 
+  minigameArenaEl.classList.remove('hidden');
+  actionPillsEl.innerHTML = `<span class="action-label">CHALLENGE ACTIVE: Resolve the puzzle below</span>`;
+
   const state: MinigameState = {
     template: challengeToRun.template,
     active: true,
     params: challengeToRun.params,
-    print: (txt: string, cls?: string) => printLine(txt, cls),
+    print: (txt: string, cls?: string) => {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = txt;
+      minigameArenaEl.appendChild(line);
+      minigameArenaEl.scrollTop = minigameArenaEl.scrollHeight;
+      appendHistory(txt, cls);
+    },
     onSuccess: () => {
       solvedRooms.add(currentRoomId);
       activeMinigame = null;
-      printLine('\nPath unsealed. You can move forward now.', 'bright');
-      printRoomExits(STORY_ROOMS[currentRoomId]);
+      printNarrative('\n>>> PATH UNSEALED. You can move forward now. <<<', 'bright');
+      renderActionPills(STORY_ROOMS[currentRoomId]);
       syncState();
       triggerDirectorLookahead();
     },
@@ -397,29 +467,15 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
   activeMinigame.start();
 }
 
-// Map
-function printAsciiMap(): void {
-  printLine('\n=================== ARCHITECTURAL MAP ===================', 'bright');
-  const getMarker = (id: string) => (currentRoomId === id ? '@' : ' ');
-  printLine(`  [${getMarker('bedroom')}] BEDROOM ---> [${getMarker('hallway')}] HALLWAY ---> [${getMarker('kitchen')}] KITCHEN === [${getMarker('pantry')}] PANTRY`);
-  printLine(`                                     |`);
-  printLine(`                               [${getMarker('stairwell')}] STAIRWELL`);
-  printLine(`                                     |`);
-  printLine(`                               [${getMarker('basement')}] BASEMENT`);
-  printLine(`                                     |`);
-  printLine(`                               [${getMarker('corridor')}] CORRIDOR`);
-  printLine(`                                     |`);
-  printLine(`                               [${getMarker('mirror_room')}] MIRROR VAULT`);
-  printLine('=========================================================\n');
-}
-
-// Death
+// Death & Respawn
 function triggerDeath(): void {
   deaths++;
   soundEngine.playGlitchNoise();
-  printArt(DEATH_ART, 'danger');
-  printLine('\nTHE THING CAUGHT YOU IN THE DARK.', 'danger');
-  printLine(`Respawning at checkpoint: [${STORY_ROOMS[checkpointRoomId].name}]...\n`);
+  clearNarrative();
+  printNarrative('========================================================', 'danger');
+  printNarrative('THE THING CAUGHT YOU IN THE DARK.', 'danger');
+  for (const l of DEATH_ART) appendHistory(l);
+  printNarrative(`Respawning at checkpoint: [${STORY_ROOMS[checkpointRoomId].name}]...\n`);
 
   addLearningFeed(`> Death event #${deaths} registered.`);
   postTelemetry('death', { room: currentRoomId, deathsTotal: deaths });
@@ -428,7 +484,7 @@ function triggerDeath(): void {
     distance = 7;
     updateDistance(distance);
     enterRoom(checkpointRoomId);
-  }, 1200);
+  }, 1400);
 }
 
 // Mirror Ending
@@ -436,24 +492,27 @@ async function triggerMirrorFinale(): Promise<void> {
   if (isEndingPlayed) return;
   isEndingPlayed = true;
 
-  printLine('\n========================================================', 'bright');
-  printLine('  YOU APPROACH THE MIRROR VAULT GLASS...                ', 'bright');
-  printLine('========================================================\n');
+  clearNarrative();
+  printNarrative('========================================================', 'bright');
+  printNarrative('YOU APPROACH THE MIRROR VAULT GLASS...', 'bright');
+  printNarrative('========================================================\n');
 
   for (let i = 0; i < MIRROR_MORPH_FRAMES.length; i++) {
     await new Promise((r) => setTimeout(r, 900));
     soundEngine.playGlitchNoise();
-    printLine(`\n[REFLECTION CYCLE ${i + 1}/5]`);
-    printArt(MIRROR_MORPH_FRAMES[i], i === 4 ? 'bright' : '');
+    printNarrative(`[REFLECTION CYCLE ${i + 1}/5]`);
+    for (const l of MIRROR_MORPH_FRAMES[i]) {
+      printNarrative(l, i === 4 ? 'bright' : '');
+    }
   }
 
   await new Promise((r) => setTimeout(r, 1200));
-  await typeWriter('\nI looked into the glass.', 20);
-  await typeWriter('There was no one behind me.', 20);
-  await typeWriter('The heavy footsteps... were my own paws.', 20);
-  await typeWriter('The voice in the walls... was my own hunger.', 20);
-  await typeWriter('I WAS NEVER RUNNING FROM THE MONSTER.', 25);
-  await typeWriter('I AM THE MONSTER.', 30);
+  await typeWriterNarrative('\nI looked into the glass.', 20);
+  await typeWriterNarrative('There was no one behind me.', 20);
+  await typeWriterNarrative('The heavy footsteps... were my own paws.', 20);
+  await typeWriterNarrative('The voice in the walls... was my own hunger.', 20);
+  await typeWriterNarrative('I WAS NEVER RUNNING FROM THE MONSTER.', 25);
+  await typeWriterNarrative('I AM THE MONSTER.', 30);
 
   await new Promise((r) => setTimeout(r, 1500));
   displayEndingFile();
@@ -461,38 +520,36 @@ async function triggerMirrorFinale(): Promise<void> {
 
 function displayEndingFile(): void {
   const profile = buildPlayerProfile();
-  printLine('\n\n========================================================', 'bright');
-  printLine('       THE FILE IT KEPT ON YOU [FINAL DOSSIER]          ', 'bright');
-  printLine('========================================================');
-  printLine(`  SESSION ID:           ${sessionId}`);
-  printLine(`  ELAPSED TIME:         ${profile.totalPlayTimeMs / 1000}s`);
-  printLine(`  TYPING SPEED:         ${profile.typingSpeedWpm} WPM`);
-  printLine(`  AVG IDLE HESITATION:  ${profile.commandIdleTimeAvgMs}ms`);
-  printLine(`  TOTAL DEATHS:         ${deaths}`);
-  printLine(`  MISTAKES REGISTERED:  ${mistakes}`);
-  printLine(`  ROOMS REVISITED:      ${roomsRevisited}`);
-  printLine(`  ASSIGNED TAGS:        ${profile.tags.join(', ')}`);
-  printLine('--------------------------------------------------------');
-  printLine('  NEURAL PROFILE DUMP (RAW JSON):');
-  printLine(JSON.stringify(profile, null, 2));
-  printLine('--------------------------------------------------------');
-  printLine('  VERDICT: THE MACHINE REMEMBERS EVERYTHING YOU DID.');
-  printLine('  THANK YOU FOR PLAYING WAKE.EXE.');
-  printLine('========================================================\n');
+  printNarrative('\n\n========================================================', 'bright');
+  printNarrative('       THE FILE IT KEPT ON YOU [FINAL DOSSIER]          ', 'bright');
+  printNarrative('========================================================');
+  printNarrative(`  SESSION ID:           ${sessionId}`);
+  printNarrative(`  ELAPSED TIME:         ${profile.totalPlayTimeMs / 1000}s`);
+  printNarrative(`  TYPING SPEED:         ${profile.typingSpeedWpm} WPM`);
+  printNarrative(`  AVG IDLE HESITATION:  ${profile.commandIdleTimeAvgMs}ms`);
+  printNarrative(`  TOTAL DEATHS:         ${deaths}`);
+  printNarrative(`  MISTAKES REGISTERED:  ${mistakes}`);
+  printNarrative(`  ROOMS REVISITED:      ${roomsRevisited}`);
+  printNarrative(`  ASSIGNED TAGS:        ${profile.tags.join(', ')}`);
+  printNarrative('--------------------------------------------------------');
+  printNarrative('  VERDICT: THE MACHINE REMEMBERS EVERYTHING YOU DID.');
+  printNarrative('  THANK YOU FOR PLAYING WAKE.EXE.');
+  printNarrative('========================================================\n');
 }
 
-// Commands
+// Command Handler
 function handleCommand(raw: string): void {
   if (isEndingPlayed) {
-    printLine('Session concluded. Reload to awaken again.');
+    printNarrative('Session concluded. Reload to awaken again.');
     return;
   }
 
-  // Calculate idle time before acting
   const now = Date.now();
   const idleMs = now - lastCommandTimestamp;
   idleTimeSamples.push(idleMs);
   lastCommandTimestamp = now;
+
+  appendHistory(`> ${raw}`);
 
   if (activeMinigame) {
     const finished = activeMinigame.handleInput(raw);
@@ -510,9 +567,9 @@ function handleCommand(raw: string): void {
         triggerMirrorFinale();
       } else {
         const room = STORY_ROOMS[currentRoomId];
-        printLine(`\n${room.name}:`);
-        for (const l of room.narration) printLine(l);
-        printRoomExits(room);
+        clearNarrative();
+        for (const l of room.narration) printNarrative(l);
+        renderActionPills(room);
       }
       break;
 
@@ -520,11 +577,11 @@ function handleCommand(raw: string): void {
       const room = STORY_ROOMS[currentRoomId];
       const exit = room.exits.find((e) => e.direction === parsed.direction);
       if (!exit) {
-        printLine(`You cannot go ${parsed.direction} from here.`);
+        printNarrative(`You cannot go ${parsed.direction} from here.`);
         return;
       }
       if (exit.locked && !solvedRooms.has(currentRoomId)) {
-        printLine(`Locked: ${exit.lockDescription || 'The way is barred.'}`, 'danger');
+        printNarrative(`Locked: ${exit.lockDescription || 'The way is barred.'}`, 'danger');
         return;
       }
       enterRoom(exit.targetRoomId);
@@ -537,9 +594,10 @@ function handleCommand(raw: string): void {
       if (itemIndex >= 0) {
         room.items.splice(itemIndex, 1);
         inventory.add(parsed.item);
-        printLine(`Taken: ${parsed.item}.`);
+        printNarrative(`Taken: ${parsed.item}.`);
+        renderActionPills(room);
       } else {
-        printLine(`No "${parsed.item}" found to take.`);
+        printNarrative(`No "${parsed.item}" found to take.`);
       }
       break;
     }
@@ -548,36 +606,46 @@ function handleCommand(raw: string): void {
       if (parsed.item === 'ethanol' && inventory.has('ethanol')) {
         inventory.delete('ethanol');
         updateDistance(distance + 2);
-        printLine('You drink the ethanol. The chemical burn clears your mind. Distance +2!', 'bright');
+        printNarrative('You drink the ethanol. The chemical burn clears your mind. Distance +2!', 'bright');
+        renderActionPills(STORY_ROOMS[currentRoomId]);
       } else if (parsed.item === 'flashlight' && inventory.has('flashlight')) {
-        printLine('The beam flickers, illuminating claw scratches on the ceiling.');
+        printNarrative('The beam flickers, illuminating claw scratches on the ceiling.');
       } else {
-        printLine(`You cannot use "${parsed.item}" right now.`);
+        printNarrative(`You cannot use "${parsed.item}" right now.`);
       }
       break;
 
     case 'inventory':
       if (inventory.size === 0) {
-        printLine('Your pockets are empty.');
+        printNarrative('Your pockets are empty.');
       } else {
-        printLine(`YOU CARRY: ${Array.from(inventory).join(', ')}`);
+        printNarrative(`YOU CARRY: ${Array.from(inventory).join(', ')}`);
       }
       break;
 
     case 'map':
-      printAsciiMap();
+      printNarrative('\nARCHITECTURAL MAP:');
+      printNarrative('  [BEDROOM] ---> [HALLWAY] ---> [KITCHEN] === [PANTRY]');
+      printNarrative('                                   |');
+      printNarrative('                             [STAIRWELL]');
+      printNarrative('                                   |');
+      printNarrative('                             [BASEMENT]');
+      printNarrative('                                   |');
+      printNarrative('                             [CORRIDOR]');
+      printNarrative('                                   |');
+      printNarrative('                             [MIRROR VAULT]');
       break;
 
     case 'help':
-      printLine('COMMANDS:');
-      printLine('  look / l           - Inspect surroundings');
-      printLine('  go <dir> / n,s,e,w - Move through doors');
-      printLine('  take <item>        - Collect item');
-      printLine('  use <item>         - Consume or interact');
-      printLine('  inventory / i      - Review your items');
-      printLine('  map / m            - Display ASCII floorplan');
-      printLine('  safe               - Toggle Safe Mode');
-      printLine('  mute               - Toggle Sound Synthesizer');
+      printNarrative('COMMANDS:');
+      printNarrative('  look / l           - Inspect surroundings');
+      printNarrative('  go <dir> / n,s,e,w - Move through doors');
+      printNarrative('  take <item>        - Collect item');
+      printNarrative('  use <item>         - Consume or interact');
+      printNarrative('  inventory / i      - Review your items');
+      printNarrative('  map / m            - Display ASCII floorplan');
+      printNarrative('  safe               - Toggle Safe Mode');
+      printNarrative('  mute               - Toggle Sound Synthesizer');
       break;
 
     case 'safe':
@@ -592,16 +660,49 @@ function handleCommand(raw: string): void {
       if (parsed.verb === 'approach' && parsed.arg === 'mirror' && currentRoomId === 'mirror_room') {
         triggerMirrorFinale();
       } else {
-        printLine(`Unknown action: "${raw}". Type "help" for valid commands.`);
+        printNarrative(`Unknown action: "${raw}". Type "help" or click an available action above.`);
       }
       break;
 
     default:
-      printLine(`Unknown command: "${raw}". Type "help" for options.`);
+      printNarrative(`Unknown command: "${raw}". Type "help" for options.`);
   }
 }
 
-// Telemetry & Sync
+// Konami Jumpscare
+function triggerKonamiJumpscare(): void {
+  const monsterAscii = `
+      \\ \\  / /      .------.      \\ \\  / /     
+       \\ \\/ /     /  (X)  (X) \\    \\ \\/ /      
+        \\  /     |   /=====\\   |    \\  /       
+        /  \\     |  |||||||||  |    /  \\       
+       / /\\ \\     \\  \\=====/  /    / /\\ \\      
+      / /  \\ \\     '--------'     / /  \\ \\     
+     / /    \\ \\   / / |  | \\ \\   / /    \\ \\    
+  `;
+
+  jumpscareArtEl.textContent = monsterAscii;
+
+  if (isSafeMode) {
+    jumpscareTextEl.textContent = '[SAFE MODE: THE GHOST OBSERVES YOUR CHEAT CODE IN SILENCE]';
+    soundEngine.playKeyClick();
+  } else {
+    jumpscareTextEl.textContent = 'YOU CALLED UPON WHAT SHOULD HAVE SLEPT';
+    soundEngine.playGlitchNoise();
+  }
+
+  jumpscareOverlayEl.classList.remove('hidden');
+  jumpscareOverlayEl.classList.add('active');
+
+  setTimeout(() => {
+    jumpscareOverlayEl.classList.remove('active');
+    jumpscareOverlayEl.classList.add('hidden');
+    printNarrative('\n[SYSTEM: KONAMI SEQUENCE DETECTED. GHOST PROFILE UPDATED.]', 'danger');
+    addLearningFeed('> Konami code breached memory limits.');
+  }, isSafeMode ? 2500 : 1800);
+}
+
+// Telemetry & State Persistence
 async function syncState(): Promise<void> {
   const profile = buildPlayerProfile();
   const state = {
@@ -640,10 +741,26 @@ async function postTelemetry(type: string, data: any): Promise<void> {
   }
 }
 
-// Boot
+// Navigation Tabs
+tabChamberBtn.addEventListener('click', () => {
+  tabChamberBtn.classList.add('active');
+  tabLogsBtn.classList.remove('active');
+  chamberViewEl.classList.remove('hidden');
+  logsViewEl.classList.add('hidden');
+  inputEl.focus();
+});
+
+tabLogsBtn.addEventListener('click', () => {
+  tabLogsBtn.classList.add('active');
+  tabChamberBtn.classList.remove('active');
+  logsViewEl.classList.remove('hidden');
+  chamberViewEl.classList.add('hidden');
+});
+
+// Boot & Init
 async function boot(): Promise<void> {
-  printArt(TITLE_ART, 'bright');
-  printLine('\n[SYSTEM INITIALIZED] Connecting to Ghost in the Machine...');
+  for (const l of TITLE_ART) appendHistory(l);
+  appendHistory('\n[SYSTEM INITIALIZED] Connecting to Ghost in the Machine...');
 
   const startReq = performance.now();
   try {
@@ -653,11 +770,11 @@ async function boot(): Promise<void> {
     const health = (await res.json()) as HealthData;
     ghostProviderEl.textContent = health.provider.toUpperCase();
     ghostModelEl.textContent = health.model;
-    ghostStatusEl.textContent = health.providerConnected ? 'ONLINE' : 'FALLBACK';
+    ghostStatusBadgeEl.textContent = health.providerConnected ? 'GHOST: ONLINE' : 'GHOST: FALLBACK';
   } catch (err) {
     ghostLatencyEl.textContent = '0ms';
     ghostProviderEl.textContent = 'NONE';
-    ghostStatusEl.textContent = 'STANDALONE';
+    ghostStatusBadgeEl.textContent = 'GHOST: STANDALONE';
   }
 
   updateDistance(10);
@@ -671,7 +788,6 @@ inputEl.addEventListener('keydown', (e) => {
   soundEngine.playKeyClick();
   keystrokeCount++;
 
-  // Simple typing speed tracking
   const elapsedMinutes = Math.max(0.1, (Date.now() - startTime) / 60000);
   typingSpeedWpm = Math.round((keystrokeCount / 5) / elapsedMinutes);
 
@@ -687,7 +803,6 @@ inputEl.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const val = inputEl.value.trim();
     if (!val) return;
-    printLine(`> ${val}`);
     inputEl.value = '';
     handleCommand(val);
   }
@@ -697,14 +812,15 @@ themeToggleEl.addEventListener('click', () => {
   isMonochrome = !isMonochrome;
   document.body.classList.toggle('monochrome', isMonochrome);
   themeToggleEl.textContent = isMonochrome ? '[COLOR: MONO]' : '[COLOR: GREEN]';
+  renderer3d.setThemeColor(isMonochrome ? '#ffffff' : '#33ff33');
 });
 
 safeModeToggleEl.addEventListener('click', () => {
   isSafeMode = !isSafeMode;
   document.body.classList.toggle('safe-mode', isSafeMode);
   soundEngine.setSafeMode(isSafeMode);
-  safeModeToggleEl.textContent = isSafeMode ? '[SAFE MODE: ON]' : '[SAFE MODE: OFF]';
-  printLine(`Safe Mode is now ${isSafeMode ? 'ON (No jumpscares/flashing)' : 'OFF'}.`);
+  safeModeToggleEl.textContent = isSafeMode ? '[SAFE: ON]' : '[SAFE: OFF]';
+  printNarrative(`Safe Mode is now ${isSafeMode ? 'ON (Suppressing flashes & jumpscares)' : 'OFF'}.`);
 });
 
 audioToggleEl.addEventListener('click', () => {
@@ -713,39 +829,6 @@ audioToggleEl.addEventListener('click', () => {
   audioToggleEl.textContent = isAudioMuted ? '[AUDIO: OFF]' : '[AUDIO: ON]';
 });
 
-function triggerKonamiJumpscare(): void {
-  const monsterAscii = `
-      \\ \\  / /      .------.      \\ \\  / /     
-       \\ \\/ /     /  (X)  (X) \\    \\ \\/ /      
-        \\  /     |   /=====\\   |    \\  /       
-        /  \\     |  |||||||||  |    /  \\       
-       / /\\ \\     \\  \\=====/  /    / /\\ \\      
-      / /  \\ \\     '--------'     / /  \\ \\     
-     / /    \\ \\   / / |  | \\ \\   / /    \\ \\    
-  `;
-
-  jumpscareArtEl.textContent = monsterAscii;
-
-  if (isSafeMode) {
-    jumpscareTextEl.textContent = '[SAFE MODE: THE GHOST OBSERVES YOUR CHEAT CODE IN SILENCE]';
-    soundEngine.playKeyClick();
-  } else {
-    jumpscareTextEl.textContent = 'YOU CALLED UPON WHAT SHOULD HAVE SLEPT';
-    soundEngine.playGlitchNoise();
-  }
-
-  jumpscareOverlayEl.classList.remove('hidden');
-  jumpscareOverlayEl.classList.add('active');
-
-  setTimeout(() => {
-    jumpscareOverlayEl.classList.remove('active');
-    jumpscareOverlayEl.classList.add('hidden');
-    printLine('\n[SYSTEM: KONAMI SEQUENCE DETECTED. GHOST PROFILE UPDATED.]', 'danger');
-    addLearningFeed('> Konami code breached memory limits.');
-  }, isSafeMode ? 2500 : 1800);
-}
-
-// Global Key Listeners
 window.addEventListener('keydown', (e) => {
   if (e.key === '`' || e.key === '~') {
     e.preventDefault();
@@ -754,7 +837,6 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Konami progress check
   if (e.key.toLowerCase() === KONAMI_CODE[konamiPos].toLowerCase()) {
     konamiPos++;
     if (konamiPos === KONAMI_CODE.length) {
@@ -771,5 +853,4 @@ closeDebugBtn.addEventListener('click', () => {
   debugModalEl.classList.add('hidden');
 });
 
-// Run boot
 boot();

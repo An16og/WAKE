@@ -10,61 +10,115 @@
   <div class="crt-overlay"></div>
   <div class="scanlines"></div>
 
-  <div id="app" class="app-container">
-    <header class="system-header">
-      <div class="brand">WAKE.EXE [SYSTEM TERMINAL v0.1.0]</div>
-      <div class="system-controls">
+  <div id="app" class="cli-app">
+    <!-- Top System Bar -->
+    <header class="cli-header">
+      <div class="cli-brand">
+        <span class="brand-title">WAKE.EXE</span>
+        <span class="brand-sub">[ROM v0.2.0]</span>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="cli-tabs">
+        <button id="tab-chamber-btn" class="cli-tab active">[ 1: CHAMBER ]</button>
+        <button id="tab-logs-btn" class="cli-tab">[ 2: LOGS & HISTORY ]</button>
+      </nav>
+
+      <div class="cli-toggles">
         <span id="theme-toggle" class="clickable">[COLOR: GREEN]</span>
-        <span id="safe-mode-toggle" class="clickable">[SAFE MODE: OFF]</span>
+        <span id="safe-mode-toggle" class="clickable">[SAFE: OFF]</span>
         <span id="audio-toggle" class="clickable">[AUDIO: OFF]</span>
       </div>
     </header>
 
-    <div class="main-layout">
-      <main id="terminal-pane" class="terminal-pane" tabindex="0">
-        <div id="terminal-output" class="terminal-output"></div>
-        <div id="terminal-prompt-line" class="prompt-line">
-          <span class="prompt-symbol">&gt;&nbsp;</span>
-          <input type="text" id="terminal-input" autofocus autocomplete="off" spellcheck="false" />
+    <!-- Main Active Chamber View -->
+    <main id="chamber-view" class="view-panel active">
+      <!-- 3D 1-bit Vector Room Canvas -->
+      <div class="viewport-card">
+        <div class="viewport-header">
+          <span id="room-title" class="room-title">LOCATION // BEDROOM</span>
+          <span id="ghost-status-badge" class="badge">GHOST: ONLINE</span>
         </div>
-      </main>
-
-      <aside id="ghost-pane" class="ghost-pane">
-        <div class="pane-title">GHOST // PROCESS</div>
-        <div class="ghost-section">
-          <div class="status-row"><span class="label">PROVIDER:</span> <span id="ghost-provider" class="val">DETECTING...</span></div>
-          <div class="status-row"><span class="label">MODEL:</span> <span id="ghost-model" class="val">--</span></div>
-          <div class="status-row"><span class="label">STATUS:</span> <span id="ghost-status" class="val">OFFLINE</span></div>
-          <div class="status-row"><span class="label">LATENCY:</span> <span id="ghost-latency" class="val">0ms</span></div>
-        </div>
-
-        <div class="pane-title">LOOKAHEAD QUEUE</div>
-        <div id="queue-slots" class="queue-slots">
-          <div class="queue-slot empty">[SLOT 1] PENDING</div>
-          <div class="queue-slot empty">[SLOT 2] PENDING</div>
-          <div class="queue-slot empty">[SLOT 3] PENDING</div>
-        </div>
-
-        <div class="pane-title">PLAYER PROFILE</div>
-        <div id="profile-tags" class="profile-tags">
-          <span class="tag">CALIBRATING</span>
-        </div>
-
-        <div class="pane-title">NEURAL LEARNING FEED</div>
-        <div id="learning-feed" class="learning-feed">
-          <div class="feed-item">&gt; Listening on memory bus...</div>
-        </div>
-      </aside>
-    </div>
-
-    <footer class="system-footer">
-      <div id="distance-meter" class="distance-meter">
-        DISTANCE TO THING: [==========] 10/10
+        <canvas id="room-canvas-3d" class="room-canvas"></canvas>
       </div>
-      <div class="hint-bar">Press ~ for Debug Console | Type 'help' for commands</div>
-    </footer>
+
+      <!-- Atmospheric Narrative Box & Minigame Arena -->
+      <div class="narrative-card">
+        <div id="narrative-output" class="narrative-text"></div>
+        <div id="minigame-arena" class="minigame-arena hidden"></div>
+      </div>
+
+      <!-- Quick Action Pills -->
+      <div class="action-bar-container">
+        <span class="action-label">AVAILABLE ACTIONS:</span>
+        <div id="action-pills" class="action-pills">
+          <!-- Populated dynamically: e.g. [look], [go north], [take key] -->
+        </div>
+      </div>
+
+      <!-- Centered Command Input Box -->
+      <div class="prompt-box">
+        <span class="prompt-arrow">&gt;</span>
+        <input
+          type="text"
+          id="terminal-input"
+          autofocus
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Type command or click an action above... (Tab to autocomplete)"
+        />
+      </div>
+
+      <!-- Footer Distance Tracker -->
+      <div class="cli-footer">
+        <div id="distance-meter" class="distance-meter">
+          DISTANCE TO THING: [==========] 10/10
+        </div>
+        <div class="sub-hints">Type 'help' for commands | Press ~ for Raw JSON</div>
+      </div>
+    </main>
+
+    <!-- Logs & Ghost Process View -->
+    <section id="logs-view" class="view-panel hidden">
+      <div class="logs-grid">
+        <!-- Full Terminal History -->
+        <div class="terminal-history-pane">
+          <div class="pane-header">TRANSCRIPT LOGS</div>
+          <div id="terminal-history-output" class="history-content"></div>
+        </div>
+
+        <!-- Ghost Process & Lookahead Queue Telemetry -->
+        <aside class="ghost-telemetry-pane">
+          <div class="pane-header">GHOST // NEURAL PROCESS</div>
+          
+          <div class="telemetry-block">
+            <div class="stat-line"><span class="k">PROVIDER:</span> <span id="ghost-provider" class="v">OLLAMA</span></div>
+            <div class="stat-line"><span class="k">MODEL:</span> <span id="ghost-model" class="v">GEMMA</span></div>
+            <div class="stat-line"><span class="k">LATENCY:</span> <span id="ghost-latency" class="v">0ms</span></div>
+          </div>
+
+          <div class="pane-header sub">LOOKAHEAD QUEUE</div>
+          <div id="queue-slots" class="queue-slots">
+            <div class="queue-slot empty">[SLOT 1] PENDING</div>
+            <div class="queue-slot empty">[SLOT 2] PENDING</div>
+            <div class="queue-slot empty">[SLOT 3] PENDING</div>
+          </div>
+
+          <div class="pane-header sub">PLAYER PROFILE TAGS</div>
+          <div id="profile-tags" class="profile-tags">
+            <span class="tag">CALIBRATING</span>
+          </div>
+
+          <div class="pane-header sub">NEURAL LEARNING FEED</div>
+          <div id="learning-feed" class="learning-feed">
+            <div class="feed-item">&gt; Listening on memory bus...</div>
+          </div>
+        </aside>
+      </div>
+    </section>
   </div>
 
+  <!-- Debug Modal (~ toggle) -->
   <div id="debug-modal" class="debug-modal hidden">
     <div class="debug-header">
       <span>GHOST // DEBUG CONSOLE</span>
@@ -73,6 +127,7 @@
     <pre id="debug-json">No raw telemetry captured yet.</pre>
   </div>
 
+  <!-- Konami Jumpscare Overlay -->
   <div id="jumpscare-overlay" class="jumpscare-overlay hidden">
     <div class="jumpscare-content">
       <pre id="jumpscare-art"></pre>
