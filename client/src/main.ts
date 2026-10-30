@@ -1,4 +1,25 @@
-// WAKE.EXE - Client Core Boot Engine
+// WAKE.EXE - Master Game Engine & Terminal Client
+import {
+  parseCommand,
+  getAutocompleteSuggestions
+} from '@wake/shared';
+import {
+  STORY_ROOMS,
+  ROOM_ART,
+  TITLE_ART,
+  DEATH_ART,
+  MIRROR_MORPH_FRAMES,
+  FALLBACK_CHALLENGES
+} from '@wake/content';
+import {
+  WordleRunner,
+  BlackjackRunner,
+  CipherRunner,
+  SimonRunner,
+  DarkMazeRunner,
+  MinigameState
+} from './minigames/runners.js';
+import { soundEngine } from './audio.js';
 
 interface HealthData {
   status: 'ok' | 'degraded' | 'error';
@@ -9,21 +30,50 @@ interface HealthData {
   details?: string;
 }
 
+// DOM Elements
 const outputEl = document.getElementById('terminal-output') as HTMLDivElement;
 const inputEl = document.getElementById('terminal-input') as HTMLInputElement;
+const distanceMeterEl = document.getElementById('distance-meter') as HTMLElement;
 const ghostProviderEl = document.getElementById('ghost-provider') as HTMLElement;
 const ghostModelEl = document.getElementById('ghost-model') as HTMLElement;
 const ghostStatusEl = document.getElementById('ghost-status') as HTMLElement;
 const ghostLatencyEl = document.getElementById('ghost-latency') as HTMLElement;
+const profileTagsEl = document.getElementById('profile-tags') as HTMLElement;
+const queueSlotsEl = document.getElementById('queue-slots') as HTMLElement;
+const learningFeedEl = document.getElementById('learning-feed') as HTMLElement;
 const themeToggleEl = document.getElementById('theme-toggle') as HTMLElement;
 const safeModeToggleEl = document.getElementById('safe-mode-toggle') as HTMLElement;
+const audioToggleEl = document.getElementById('audio-toggle') as HTMLElement;
 const debugModalEl = document.getElementById('debug-modal') as HTMLElement;
 const closeDebugBtn = document.getElementById('close-debug-btn') as HTMLElement;
+const debugJsonEl = document.getElementById('debug-json') as HTMLElement;
 
+// Session & Telemetry State
+const sessionId = localStorage.getItem('wake_session_id') || `wake-${Math.random().toString(36).substring(2, 9)}`;
+localStorage.setItem('wake_session_id', sessionId);
+
+let currentRoomId = 'bedroom';
+let checkpointRoomId = 'bedroom';
+let distance = 10;
+const inventory = new Set<string>();
+const solvedRooms = new Set<string>();
+const visitedRooms = new Set<string>();
+
+// Telemetry trackers
+let deaths = 0;
+let mistakes = 0;
+let roomsRevisited = 0;
+const startTime = Date.now();
+let activeMinigame: any = null;
+let isEndingPlayed = false;
+
+// UI State
 let isMonochrome = false;
 let isSafeMode = false;
+let isAudioMuted = true;
 let isDebugOpen = false;
 
+// Helper: Output formatting
 function printLine(text: string, className = ''): void {
   const line = document.createElement('div');
   line.className = className;
@@ -32,70 +82,467 @@ function printLine(text: string, className = ''): void {
   outputEl.scrollTop = outputEl.scrollHeight;
 }
 
-async function typeWriter(text: string, speed = 15): Promise<void> {
+function printArt(lines: string[], className = ''): void {
+  for (const l of lines) {
+    printLine(l, className);
+  }
+}
+
+async function typeWriter(text: string, speed = 12): Promise<void> {
   const line = document.createElement('div');
   outputEl.appendChild(line);
   for (let i = 0; i < text.length; i++) {
     line.textContent += text[i];
     outputEl.scrollTop = outputEl.scrollHeight;
+    soundEngine.playKeyClick();
     await new Promise((r) => setTimeout(r, speed));
   }
 }
 
-async function checkHealth(): Promise<HealthData | null> {
-  const start = performance.now();
-  try {
-    const res = await fetch('/health');
-    const latency = Math.round(performance.now() - start);
-    ghostLatencyEl.textContent = `${latency}ms`;
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-    const data = (await res.json()) as HealthData;
-    ghostProviderEl.textContent = data.provider.toUpperCase();
-    ghostModelEl.textContent = data.model;
-    ghostStatusEl.textContent = data.providerConnected ? 'ONLINE' : 'DEGRADED';
-    ghostStatusEl.style.color = data.providerConnected ? 'var(--fg-bright)' : 'var(--danger-color)';
-    return data;
-  } catch (err: any) {
-    ghostProviderEl.textContent = 'ERROR';
-    ghostStatusEl.textContent = 'OFFLINE';
-    ghostStatusEl.style.color = 'var(--danger-color)';
-    return null;
+// Distance Meter & Health
+function updateDistance(newDist: number): void {
+  distance = Math.max(0, Math.min(10, newDist));
+  soundEngine.setDistance(distance);
+
+  const filled = '='.repeat(distance);
+  const empty = ' '.repeat(10 - distance);
+  distanceMeterEl.textContent = `DISTANCE TO THING: [${filled}${empty}] ${distance}/10`;
+
+  if (distance <= 0) {
+    triggerDeath();
   }
 }
 
-async function runBootSequence(): Promise<void> {
-  printLine('========================================================');
-  printLine('  WAKE.EXE [ROM BIOS v0.1.0-alpha] (c) 2026            ');
-  printLine('  MEMORY TEST: 65536 KB OK                             ');
-  printLine('========================================================\n');
+function recordMistake(penalty: number, mistakeName: string): void {
+  mistakes++;
+  updateDistance(distance - penalty);
+  postTelemetry('mistake', { mistakeName, penalty, distanceRemaining: distance });
+  addLearningFeed(`> Mistake noted: ${mistakeName} (Distance -${penalty})`);
+  recalculateTags();
+}
 
-  await new Promise((r) => setTimeout(r, 200));
-  await typeWriter('> INITIALIZING GHOST DIRECTIVE SUBSYSTEM...', 10);
-  
-  const health = await checkHealth();
-  if (health) {
-    await typeWriter(`> CONNECTED TO PROVIDER: [${health.provider.toUpperCase()}]`, 10);
-    await typeWriter(`> ACTIVE MODEL: [${health.model}]`, 10);
-    if (!health.providerConnected) {
-      printLine(`> WARNING: ${health.details || 'Model not loaded; deterministic fallback active.'}`, 'danger');
-    }
+function addLearningFeed(msg: string): void {
+  const item = document.createElement('div');
+  item.className = 'feed-item';
+  item.textContent = msg;
+  learningFeedEl.prepend(item);
+  if (learningFeedEl.children.length > 8) {
+    learningFeedEl.removeChild(learningFeedEl.lastChild!);
+  }
+}
+
+function recalculateTags(): void {
+  const tags: string[] = [];
+  if (mistakes === 0 && distance >= 9) tags.push('METHODICAL');
+  if (mistakes >= 3) tags.push('HESITANT');
+  if (deaths > 0) tags.push('MARKED');
+  if (visitedRooms.size > 4) tags.push('INQUISITIVE');
+  if (tags.length === 0) tags.push('CALIBRATING');
+
+  profileTagsEl.innerHTML = '';
+  for (const t of tags) {
+    const span = document.createElement('span');
+    span.className = 'tag';
+    span.textContent = t;
+    profileTagsEl.appendChild(span);
+  }
+}
+
+// Room Display Engine
+function enterRoom(roomId: string): void {
+  const room = STORY_ROOMS[roomId];
+  if (!room) return;
+
+  if (visitedRooms.has(roomId)) {
+    roomsRevisited++;
   } else {
-    printLine('> ERROR: Could not contact neural backend. Falling back to local offline mode.', 'danger');
+    visitedRooms.add(roomId);
   }
 
-  await typeWriter('> CHECKING REALITY BUFFER INTEGRITY... [OK]', 10);
-  await typeWriter('> DISTANCE TRACKER ENGAGED: TARGET RANGE 10 METERS', 10);
-  printLine('\n');
+  currentRoomId = roomId;
+  if (room.checkpoint) {
+    checkpointRoomId = roomId;
+  }
+
+  printLine('\n========================================================', 'bright');
+  printLine(`  LOCATION: [${room.name}]`, 'bright');
+  printLine('========================================================\n');
+
+  // Render Room ASCII Art
+  if (ROOM_ART[roomId]) {
+    printArt(ROOM_ART[roomId]);
+    printLine('');
+  }
+
+  // Narration blending: As we reach basement & corridor, blend first-person drift
+  const driftIndex = ['bedroom', 'hallway', 'kitchen', 'stairwell', 'basement', 'corridor', 'mirror_room'].indexOf(roomId);
+  if (driftIndex >= 4) {
+    // Heavy first person drift
+    for (const line of room.firstPersonDrift) {
+      printLine(line);
+    }
+  } else {
+    for (const line of room.narration) {
+      printLine(line);
+    }
+  }
+
+  // Check if room has an unsolved challenge
+  if (room.challengeTemplate && !solvedRooms.has(roomId)) {
+    startRoomChallenge(room.challengeTemplate, room.defaultChallengeId);
+  } else {
+    // Print visible exits
+    printRoomExits(room);
+  }
+
+  syncState();
+  recalculateTags();
+}
+
+function printRoomExits(room: any): void {
+  printLine('\nOBVIOUS EXITS:');
+  for (const exit of room.exits) {
+    const targetRoom = STORY_ROOMS[exit.targetRoomId];
+    const status = exit.locked ? '[LOCKED]' : '[OPEN]';
+    printLine(`  - ${exit.direction.toUpperCase()} -> ${targetRoom?.name || exit.targetRoomId} ${status}`);
+  }
+  if (room.items && room.items.length > 0) {
+    printLine(`ITEMS HERE: ${room.items.join(', ')}`);
+  }
+}
+
+// Minigame Launcher
+function startRoomChallenge(template: string, defaultChallengeId?: string): void {
+  const challenge = FALLBACK_CHALLENGES.find((c) => c.id === defaultChallengeId) ||
+    FALLBACK_CHALLENGES.find((c) => c.template === template) ||
+    FALLBACK_CHALLENGES[0];
+
+  const state: MinigameState = {
+    template,
+    active: true,
+    params: challenge.params,
+    print: (txt: string, cls?: string) => printLine(txt, cls),
+    onSuccess: () => {
+      solvedRooms.add(currentRoomId);
+      activeMinigame = null;
+      printLine('\nPath unsealed. You can move forward now.', 'bright');
+      printRoomExits(STORY_ROOMS[currentRoomId]);
+      syncState();
+    },
+    onMistake: (penalty: number, mistakeName: string) => {
+      recordMistake(penalty, mistakeName);
+    }
+  };
+
+  switch (template) {
+    case 'wordle':
+      activeMinigame = new WordleRunner(state);
+      break;
+    case 'blackjack':
+      activeMinigame = new BlackjackRunner(state);
+      break;
+    case 'cipher':
+      activeMinigame = new CipherRunner(state);
+      break;
+    case 'simon':
+      activeMinigame = new SimonRunner(state);
+      break;
+    case 'dark_maze':
+      activeMinigame = new DarkMazeRunner(state);
+      break;
+    default:
+      solvedRooms.add(currentRoomId);
+      return;
+  }
+
+  activeMinigame.start();
+}
+
+// ASCII Map
+function printAsciiMap(): void {
+  printLine('\n=================== ARCHITECTURAL MAP ===================', 'bright');
+  const getMarker = (id: string) => (currentRoomId === id ? '@' : ' ');
+  printLine(`  [${getMarker('bedroom')}] BEDROOM ---> [${getMarker('hallway')}] HALLWAY ---> [${getMarker('kitchen')}] KITCHEN === [${getMarker('pantry')}] PANTRY`);
+  printLine(`                                     |`);
+  printLine(`                               [${getMarker('stairwell')}] STAIRWELL`);
+  printLine(`                                     |`);
+  printLine(`                               [${getMarker('basement')}] BASEMENT`);
+  printLine(`                                     |`);
+  printLine(`                               [${getMarker('corridor')}] CORRIDOR`);
+  printLine(`                                     |`);
+  printLine(`                               [${getMarker('mirror_room')}] MIRROR VAULT`);
+  printLine('=========================================================\n');
+}
+
+// Death & Respawn
+function triggerDeath(): void {
+  deaths++;
+  soundEngine.playGlitchNoise();
+  printArt(DEATH_ART, 'danger');
+  printLine('\nTHE THING CAUGHT YOU IN THE DARK.', 'danger');
+  printLine(`Respawning at checkpoint: [${STORY_ROOMS[checkpointRoomId].name}]...\n`);
+
+  addLearningFeed(`> Death event #${deaths} recorded. Ghost laughs.`);
+  postTelemetry('death', { room: currentRoomId, deathsTotal: deaths });
+
+  setTimeout(() => {
+    distance = 7;
+    updateDistance(distance);
+    enterRoom(checkpointRoomId);
+  }, 1200);
+}
+
+// Mirror Ending Morph Sequence
+async function triggerMirrorFinale(): Promise<void> {
+  if (isEndingPlayed) return;
+  isEndingPlayed = true;
+
+  printLine('\n========================================================', 'bright');
+  printLine('  YOU APPROACH THE MIRROR VAULT GLASS...                ', 'bright');
+  printLine('========================================================\n');
+
+  for (let i = 0; i < MIRROR_MORPH_FRAMES.length; i++) {
+    await new Promise((r) => setTimeout(r, 900));
+    soundEngine.playGlitchNoise();
+    printLine(`\n[REFLECTION CYCLE ${i + 1}/5]`);
+    printArt(MIRROR_MORPH_FRAMES[i], i === 4 ? 'bright' : '');
+  }
+
+  await new Promise((r) => setTimeout(r, 1200));
+  await typeWriter('\nI looked into the glass.', 20);
+  await typeWriter('There was no one behind me.', 20);
+  await typeWriter('The heavy footsteps... were my own paws.', 20);
+  await typeWriter('The voice in the walls... was my own hunger.', 20);
+  await typeWriter('I WAS NEVER RUNNING FROM THE MONSTER.', 25);
+  await typeWriter('I AM THE MONSTER.', 30);
+
+  await new Promise((r) => setTimeout(r, 1500));
+  displayEndingFile();
+}
+
+function displayEndingFile(): void {
+  const playTimeSec = Math.round((Date.now() - startTime) / 1000);
+  printLine('\n\n========================================================', 'bright');
+  printLine('       THE FILE IT KEPT ON YOU [FINAL DOSSIER]          ', 'bright');
+  printLine('========================================================');
+  printLine(`  SESSION ID:           ${sessionId}`);
+  printLine(`  ELAPSED TIME:         ${playTimeSec}s`);
+  printLine(`  TOTAL DEATHS:         ${deaths}`);
+  printLine(`  MISTAKES REGISTERED:  ${mistakes}`);
+  printLine(`  ROOMS REVISITED:      ${roomsRevisited}`);
+  printLine(`  ASSIGNED TAGS:        ${Array.from(profileTagsEl.children).map(c => c.textContent).join(', ')}`);
   printLine('--------------------------------------------------------');
-  printLine('YOU WAKE FROM A NIGHTMARE.');
-  printLine('THE MONSTER IS STILL CHASING YOU.');
-  printLine('TYPE "help" OR "look" TO BEGIN.');
-  printLine('--------------------------------------------------------\n');
+  printLine('  VERDICT: THE MACHINE REMEMBERS EVERYTHING YOU DID.');
+  printLine('  THANK YOU FOR PLAYING WAKE.EXE.');
+  printLine('========================================================\n');
+}
+
+// Command Handler
+function handleCommand(raw: string): void {
+  if (isEndingPlayed) {
+    printLine('Session concluded. Reload to awaken again.');
+    return;
+  }
+
+  // Active minigame intercepts input first
+  if (activeMinigame) {
+    const finished = activeMinigame.handleInput(raw);
+    if (finished) {
+      activeMinigame = null;
+    }
+    return;
+  }
+
+  const parsed = parseCommand(raw);
+
+  switch (parsed.type) {
+    case 'look':
+      if (parsed.target === 'mirror' && currentRoomId === 'mirror_room') {
+        triggerMirrorFinale();
+      } else {
+        const room = STORY_ROOMS[currentRoomId];
+        printLine(`\n${room.name}:`);
+        for (const l of room.narration) printLine(l);
+        printRoomExits(room);
+      }
+      break;
+
+    case 'go': {
+      const room = STORY_ROOMS[currentRoomId];
+      const exit = room.exits.find((e) => e.direction === parsed.direction);
+      if (!exit) {
+        printLine(`You cannot go ${parsed.direction} from here.`);
+        return;
+      }
+      if (exit.locked && !solvedRooms.has(currentRoomId)) {
+        printLine(`Locked: ${exit.lockDescription || 'The way is barred.'}`, 'danger');
+        return;
+      }
+      enterRoom(exit.targetRoomId);
+      break;
+    }
+
+    case 'take': {
+      const room = STORY_ROOMS[currentRoomId];
+      const itemIndex = room.items.indexOf(parsed.item);
+      if (itemIndex >= 0) {
+        room.items.splice(itemIndex, 1);
+        inventory.add(parsed.item);
+        printLine(`Taken: ${parsed.item}.`);
+      } else {
+        printLine(`No "${parsed.item}" found to take.`);
+      }
+      break;
+    }
+
+    case 'use':
+      if (parsed.item === 'ethanol' && inventory.has('ethanol')) {
+        inventory.delete('ethanol');
+        updateDistance(distance + 2);
+        printLine('You drink the ethanol. The chemical burn calms your racing thoughts. Distance +2!', 'bright');
+      } else if (parsed.item === 'flashlight' && inventory.has('flashlight')) {
+        printLine('The beam flickers, illuminating claw scratches on the ceiling.');
+      } else {
+        printLine(`You cannot use "${parsed.item}" right now.`);
+      }
+      break;
+
+    case 'inventory':
+      if (inventory.size === 0) {
+        printLine('Your pockets are empty.');
+      } else {
+        printLine(`YOU CARRY: ${Array.from(inventory).join(', ')}`);
+      }
+      break;
+
+    case 'map':
+      printAsciiMap();
+      break;
+
+    case 'help':
+      printLine('COMMANDS:');
+      printLine('  look / l           - Inspect surroundings');
+      printLine('  go <dir> / n,s,e,w - Move through doors');
+      printLine('  take <item>        - Collect item');
+      printLine('  use <item>         - Consume or interact');
+      printLine('  inventory / i      - Review your items');
+      printLine('  map / m            - Display ASCII floorplan');
+      printLine('  safe               - Toggle Safe Mode');
+      printLine('  mute               - Toggle Sound Synthesizer');
+      break;
+
+    case 'safe':
+      safeModeToggleEl.click();
+      break;
+
+    case 'mute':
+      audioToggleEl.click();
+      break;
+
+    case 'action':
+      if (parsed.verb === 'approach' && parsed.arg === 'mirror' && currentRoomId === 'mirror_room') {
+        triggerMirrorFinale();
+      } else {
+        printLine(`Unknown action: "${raw}". Type "help" for valid commands.`);
+      }
+      break;
+
+    default:
+      printLine(`Unknown command: "${raw}". Type "help" for options.`);
+  }
+}
+
+// Telemetry & State Persistence
+async function syncState(): Promise<void> {
+  const state = {
+    sessionId,
+    currentRoom: currentRoomId,
+    distance,
+    inventory: Array.from(inventory),
+    solvedRooms: Array.from(solvedRooms),
+    checkpointRoom: checkpointRoomId,
+    deaths,
+    mistakes
+  };
+  debugJsonEl.textContent = JSON.stringify(state, null, 2);
+
+  try {
+    await fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state)
+    });
+  } catch (e) {
+    // offline fallback
+  }
+}
+
+async function postTelemetry(type: string, data: any): Promise<void> {
+  try {
+    await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, type, data })
+    });
+  } catch (e) {
+    // offline fallback
+  }
+}
+
+// Boot & Initialization
+async function boot(): Promise<void> {
+  printArt(TITLE_ART, 'bright');
+  printLine('\n[SYSTEM INITIALIZED] Connecting to Ghost in the Machine...');
+
+  const startReq = performance.now();
+  try {
+    const res = await fetch('/health');
+    const latency = Math.round(performance.now() - startReq);
+    ghostLatencyEl.textContent = `${latency}ms`;
+    const health = (await res.json()) as HealthData;
+    ghostProviderEl.textContent = health.provider.toUpperCase();
+    ghostModelEl.textContent = health.model;
+    ghostStatusEl.textContent = health.providerConnected ? 'ONLINE' : 'FALLBACK';
+  } catch (err) {
+    ghostLatencyEl.textContent = '0ms';
+    ghostProviderEl.textContent = 'NONE';
+    ghostStatusEl.textContent = 'STANDALONE';
+  }
+
+  // Populate initial lookahead queue indicators
+  queueSlotsEl.innerHTML = `
+    <div class="queue-slot">[SLOT 1] BEDROOM // WORDLE (STANDBY)</div>
+    <div class="queue-slot">[SLOT 2] HALLWAY // SIMON (STANDBY)</div>
+    <div class="queue-slot">[SLOT 3] KITCHEN // BLACKJACK (STANDBY)</div>
+  `;
+
+  updateDistance(10);
+  enterRoom('bedroom');
 }
 
 // Event Listeners
+inputEl.addEventListener('keydown', (e) => {
+  soundEngine.initOnGesture();
+  soundEngine.playKeyClick();
+
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const suggestions = getAutocompleteSuggestions(inputEl.value);
+    if (suggestions.length > 0) {
+      inputEl.value = suggestions[0];
+    }
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    const val = inputEl.value.trim();
+    if (!val) return;
+    printLine(`> ${val}`);
+    inputEl.value = '';
+    handleCommand(val);
+  }
+});
+
 themeToggleEl.addEventListener('click', () => {
   isMonochrome = !isMonochrome;
   document.body.classList.toggle('monochrome', isMonochrome);
@@ -105,7 +552,15 @@ themeToggleEl.addEventListener('click', () => {
 safeModeToggleEl.addEventListener('click', () => {
   isSafeMode = !isSafeMode;
   document.body.classList.toggle('safe-mode', isSafeMode);
+  soundEngine.setSafeMode(isSafeMode);
   safeModeToggleEl.textContent = isSafeMode ? '[SAFE MODE: ON]' : '[SAFE MODE: OFF]';
+  printLine(`Safe Mode is now ${isSafeMode ? 'ON (No jumpscares/flashing)' : 'OFF'}.`);
+});
+
+audioToggleEl.addEventListener('click', () => {
+  soundEngine.initOnGesture();
+  isAudioMuted = soundEngine.toggleMute();
+  audioToggleEl.textContent = isAudioMuted ? '[AUDIO: OFF]' : '[AUDIO: ON]';
 });
 
 window.addEventListener('keydown', (e) => {
@@ -121,35 +576,5 @@ closeDebugBtn.addEventListener('click', () => {
   debugModalEl.classList.add('hidden');
 });
 
-inputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    const val = inputEl.value.trim();
-    if (!val) return;
-    printLine(`> ${val}`);
-    inputEl.value = '';
-    handleCommand(val);
-  }
-});
-
-function handleCommand(cmd: string): void {
-  const lower = cmd.toLowerCase();
-  if (lower === 'help') {
-    printLine('AVAILABLE COMMANDS:');
-    printLine('  look / l           - Inspect the current surroundings');
-    printLine('  go <dir> / n,s,e,w - Move through the corridors');
-    printLine('  take <item>        - Collect an object');
-    printLine('  use <item>         - Interact with mechanism or room');
-    printLine('  inventory / i      - Check what you carry');
-    printLine('  map / m            - View known layout');
-    printLine('  safe               - Toggle safe sensory mode');
-    printLine('  mute               - Toggle sound synthesizer');
-  } else if (lower === 'safe') {
-    safeModeToggleEl.click();
-    printLine(`Safe mode is now ${isSafeMode ? 'ACTIVE' : 'DISABLED'}.`);
-  } else {
-    printLine(`Unknown command: "${cmd}". Type "help" for options.`);
-  }
-}
-
-// Start boot
-runBootSequence();
+// Start the game!
+boot();

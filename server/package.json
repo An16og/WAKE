@@ -15,6 +15,7 @@
     "@wake/shared": "*",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
+    "mongodb": "^7.7.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
