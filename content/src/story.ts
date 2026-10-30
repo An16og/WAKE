@@ -112,18 +112,18 @@ export const STORY_ROOMS: Record<string, StoryRoom> = {
     name: 'ROTTED STAIRWELL',
     narration: [
       'Steps descend into absolute blackness. The air turns freezing cold.',
-      'Every step groans underfoot like cracking ribs.',
-      'You cannot see where the steps lead without feeling the cold walls.'
+      'A terrifying shriek reverberates down the stairs directly behind your heels.',
+      'You are trapped between two desperate options as footsteps plunge toward you.'
     ],
     firstPersonDrift: [
-      'I took the stairs down into the pitch black.',
-      'My fingers dragged against wet brick.'
+      'I bolted down the stairs in the dark.',
+      'The footsteps behind me were gaining fast.'
     ],
-    challengeTemplate: 'dark_maze',
-    defaultChallengeId: 'fallback-dark_maze-1',
+    challengeTemplate: 'bandersnatch',
+    defaultChallengeId: 'fallback-bandersnatch-1',
     exits: [
       { direction: 'south', targetRoomId: 'kitchen' },
-      { direction: 'down', targetRoomId: 'basement', locked: true, lockDescription: 'The dark maze must be navigated to find the basement landing.' }
+      { direction: 'down', targetRoomId: 'basement', locked: true, lockDescription: 'You must resolve the split-second escape dilemma to reach the landing.' }
     ],
     items: [],
     checkpoint: true

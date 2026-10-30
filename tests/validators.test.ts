@@ -9,7 +9,8 @@ import {
   decryptCaesar,
   atbash,
   validateSimonParams,
-  validateDarkMazeParams
+  validateDarkMazeParams,
+  validateBandersnatchParams
 } from '@wake/shared';
 
 describe('Minigame 1: Wordle Validator & Engine', () => {
@@ -204,5 +205,42 @@ describe('Minigame 5: Dark Maze Validator & BFS Reachability', () => {
     const res = validateDarkMazeParams(maze);
     expect(res.valid).toBe(false);
     expect(res.error).toContain('exceeds moveBudget');
+  });
+});
+
+describe('Minigame 6: Bandersnatch Timed Dilemma Validator', () => {
+  it('validates a proper dilemma structure', () => {
+    const res = validateBandersnatchParams({
+      scenario: 'Claws tear through the drywall.',
+      timeLimitSec: 8,
+      choices: [
+        { id: 'c1', label: 'A: RUN', description: 'Run fast', consequence: 'You escaped', distanceDelta: 1 },
+        { id: 'c2', label: 'B: HIDE', description: 'Hide quiet', consequence: 'You hid', distanceDelta: 2 }
+      ]
+    });
+    expect(res.valid).toBe(true);
+  });
+
+  it('rejects dilemma with fewer than 2 choices (adversarial)', () => {
+    const res = validateBandersnatchParams({
+      scenario: 'Claws tear through the drywall.',
+      timeLimitSec: 8,
+      choices: [
+        { id: 'c1', label: 'ONLY CHOICE', description: 'No choice', consequence: 'Bad', distanceDelta: 0 }
+      ]
+    });
+    expect(res.valid).toBe(false);
+  });
+
+  it('rejects dilemma with empty consequences or labels (adversarial)', () => {
+    const res = validateBandersnatchParams({
+      scenario: 'Trap triggers.',
+      timeLimitSec: 8,
+      choices: [
+        { id: 'c1', label: '', description: '', consequence: 'Something', distanceDelta: 0 },
+        { id: 'c2', label: 'B', description: '', consequence: '', distanceDelta: 0 }
+      ]
+    });
+    expect(res.valid).toBe(false);
   });
 });

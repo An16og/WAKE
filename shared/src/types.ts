@@ -7,7 +7,8 @@ export const ChallengeTemplateEnum = z.enum([
   'blackjack',
   'cipher',
   'simon',
-  'dark_maze'
+  'dark_maze',
+  'bandersnatch'
 ]);
 export type ChallengeTemplate = z.infer<typeof ChallengeTemplateEnum>;
 
@@ -62,12 +63,33 @@ export const DarkMazeParamsSchema = z.object({
 });
 export type DarkMazeParams = z.infer<typeof DarkMazeParamsSchema>;
 
+// Minigame 6: Bandersnatch Timed Dilemma
+export const BandersnatchChoiceSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string(),
+  consequence: z.string(),
+  distanceDelta: z.number().int().default(0),
+  requiredItem: z.string().optional()
+});
+export type BandersnatchChoice = z.infer<typeof BandersnatchChoiceSchema>;
+
+export const BandersnatchParamsSchema = z.object({
+  scenario: z.string(),
+  timeLimitSec: z.number().int().min(4).max(20).default(10),
+  choices: z.array(BandersnatchChoiceSchema).min(2).max(4),
+  defaultChoiceIndex: z.number().int().default(0),
+  hint: z.string().default('')
+});
+export type BandersnatchParams = z.infer<typeof BandersnatchParamsSchema>;
+
 export const ChallengeParamsSchema = z.union([
   WordleParamsSchema,
   BlackjackParamsSchema,
   CipherParamsSchema,
   SimonParamsSchema,
-  DarkMazeParamsSchema
+  DarkMazeParamsSchema,
+  BandersnatchParamsSchema
 ]);
 
 export const ChallengeItemSchema = z.object({

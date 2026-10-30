@@ -168,14 +168,15 @@ INSTRUCTIONS FOR ADAPTATION:
 1. If tags contain "fast typist" or "methodical", increase difficulty to 4 or 5.
 2. If tags contain "hesitant" or deaths > 0, keep difficulty between 1 and 2.
 3. In Wordle challenges, the targetWord MUST be chosen from horror words like: [${allowedSample}].
-4. In taunts, you MUST use placeholders: {avg_think_s}, {deaths}, {last_mistake}, {typing_wpm}. Do NOT make up player facts outside these placeholders.
-5. Provide 3 next_challenges.
+4. In Bandersnatch dilemmas, provide a tense scenario and 2-3 stark choices with timeLimitSec (6-12), label, consequence, and distanceDelta (-2 to +3).
+5. In taunts, you MUST use placeholders: {avg_think_s}, {deaths}, {last_mistake}, {typing_wpm}. Do NOT make up player facts outside these placeholders.
+6. Provide 3 next_challenges.
 
 YOU MUST RESPOND ONLY WITH STRICT JSON MATCHING THIS EXACT SCHEMA:
 {
   "next_challenges": [
     {
-      "template": "wordle" | "blackjack" | "cipher" | "simon" | "dark_maze",
+      "template": "wordle" | "blackjack" | "cipher" | "simon" | "bandersnatch",
       "difficulty": 1,
       "params": {},
       "hint": "string"
@@ -253,7 +254,7 @@ function generateFallbackBatch(profile: PlayerProfile, startTime: number, retryC
   const challenges = [
     getMatchingFallback('simon', diff),
     getMatchingFallback('blackjack', diff),
-    getMatchingFallback('dark_maze', diff)
+    getMatchingFallback('bandersnatch', diff)
   ];
 
   const rawTaunts = [

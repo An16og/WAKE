@@ -1,6 +1,6 @@
 # Director Evaluation Report (N=100)
 
-Generated on: `2026-10-30T15:51:53.335Z`
+Generated on: `2026-10-30T16:33:30.683Z`
 
 ## Summary Metrics
 

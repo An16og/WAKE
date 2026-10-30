@@ -370,5 +370,107 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
       hint: 'Labyrinthine dark. Every step counts.'
     },
     hint: 'Conserve your move budget.'
+  },
+
+  // 6. Bandersnatch Timed Dilemmas (Difficulties 1-5)
+  {
+    id: 'fallback-bandersnatch-1',
+    template: 'bandersnatch',
+    difficulty: 1,
+    params: {
+      scenario: 'Claws scrape behind the drywall. You see an unlatched iron bulkhead and a low crawlspace duct.',
+      timeLimitSec: 10,
+      choices: [
+        {
+          id: 'choice-slam',
+          label: 'A: SLAM IRON BULKHEAD',
+          description: 'Heave the heavy iron door shut and drop the latch.',
+          consequence: 'The heavy iron slab slams shut with a deafening boom. Something crashes violently against the opposite side, but the latch holds!',
+          distanceDelta: 1
+        },
+        {
+          id: 'choice-duct',
+          label: 'B: DIVE INTO DUCT',
+          description: 'Squeeze through the narrow ventilation shaft in silence.',
+          consequence: 'You slide into the narrow cold duct. The thing drags past the hallway outside without detecting your position!',
+          distanceDelta: 2
+        },
+        {
+          id: 'choice-flash',
+          label: 'C: [FLASHLIGHT] BLIND THE SHADOW',
+          description: 'Turn and fire high lumens directly down the hallway.',
+          consequence: 'The intense beam catches a glistening silhouette. A horrifying shriek tears through the corridor as it recoils backwards into shadow!',
+          distanceDelta: 3,
+          requiredItem: 'flashlight'
+        }
+      ],
+      defaultChoiceIndex: 0,
+      hint: 'Decide quickly before the monster reaches the door.'
+    },
+    hint: 'A quick reaction earns precious distance.'
+  },
+  {
+    id: 'fallback-bandersnatch-2',
+    template: 'bandersnatch',
+    difficulty: 2,
+    params: {
+      scenario: 'The floorboards groan and begin to splinter. Ahead, high-voltage junction cables hang spit sparks over a flooded floor.',
+      timeLimitSec: 8,
+      choices: [
+        {
+          id: 'choice-leap',
+          label: 'A: SPRINT THROUGH WATER',
+          description: 'Risk the shallow water and sprint across the live cables.',
+          consequence: 'Current shocks your boots and numbness bites your legs, but momentum carries you across to safety!',
+          distanceDelta: 1
+        },
+        {
+          id: 'choice-pipe',
+          label: 'B: CLIMB STEAM PIPES',
+          description: 'Pull yourself up and shimmy along the boiling pipes.',
+          consequence: 'The heat burns your palms, but you bypass the electrified pool completely. The monster hesitates at the water!',
+          distanceDelta: 2
+        },
+        {
+          id: 'choice-wrench',
+          label: 'C: [WRENCH] CUT POWER BREAKER',
+          description: 'Lever the wrench against the master breaker box.',
+          consequence: 'With a heavy metallic snap, you smash the circuit breaker. Sparks die out and the corridor plunges into dead silence!',
+          distanceDelta: 3,
+          requiredItem: 'wrench'
+        }
+      ],
+      defaultChoiceIndex: 0,
+      hint: 'Choose your crossing before the floor collapses.'
+    },
+    hint: 'Hazardous terrain ahead.'
+  },
+  {
+    id: 'fallback-bandersnatch-3',
+    template: 'bandersnatch',
+    difficulty: 3,
+    params: {
+      scenario: 'The furnace groans at critical pressure. Black smoke pours through the grating. An emergency blow-off valve is stuck.',
+      timeLimitSec: 7,
+      choices: [
+        {
+          id: 'choice-vent',
+          label: 'A: VENT STEAM REARWARD',
+          description: 'Force the lever to flood the corridor behind you with boiling fog.',
+          consequence: 'Superheated vapor engulfs the corridor behind you. A howling screech confirms the monster was caught in the blast!',
+          distanceDelta: 2
+        },
+        {
+          id: 'choice-evade',
+          label: 'B: DUCK BEHIND RETAINING WALL',
+          description: 'Brace behind concrete shields as pipes begin to burst.',
+          consequence: 'Shrapnel ricochets off concrete shields. You emerge coughing through smoke, untouched.',
+          distanceDelta: 1
+        }
+      ],
+      defaultChoiceIndex: 0,
+      hint: 'The pressure gauge is already in the red zone.'
+    },
+    hint: 'Steam is your shield.'
   }
 ];

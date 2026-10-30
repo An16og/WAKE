@@ -11,8 +11,10 @@ export interface MinigameState {
   template: string;
   active: boolean;
   params: any;
+  inventory?: Set<string>;
   onSuccess: () => void;
   onMistake: (penaltyDistance: number, mistakeName: string) => void;
+  onDistanceChange?: (delta: number) => void;
   print: (text: string, className?: string) => void;
 }
 
@@ -366,6 +368,135 @@ export class DarkMazeRunner {
     const lines = renderDarkMaze(this.grid, this.playerPos, this.visionRadius);
     for (const l of lines) {
       this.state.print(l);
+    }
+  }
+}
+
+export class BandersnatchRunner {
+  private state: MinigameState;
+  private scenario: string;
+  private choices: any[];
+  private timeLimitSec: number;
+  private timeLeft: number;
+  private timerId: any = null;
+  private isResolved: boolean = false;
+
+  constructor(state: MinigameState) {
+    this.state = state;
+    this.scenario = state.params.scenario || 'A sudden choice looms in the dark...';
+    this.choices = state.params.choices || [];
+    // If player has flashlight, gives +4 seconds bonus decision time!
+    const bonus = state.inventory?.has('flashlight') ? 4 : 0;
+    this.timeLimitSec = (state.params.timeLimitSec || 10) + bonus;
+    this.timeLeft = this.timeLimitSec;
+  }
+
+  public start(): void {
+    this.state.print('\n=== DYNAMIC SPLIT-SECOND DILEMMA (BANDERSNATCH) ===', 'bright');
+    this.state.print(this.scenario, 'bright');
+
+    if (this.state.inventory?.has('flashlight')) {
+      this.state.print('[FLASHLIGHT PERK: Illumination grants +4s decision buffer!]', 'bright');
+    }
+
+    this.renderChoices();
+    this.startTimer();
+  }
+
+  private renderChoices(): void {
+    this.state.print('\nMAKE YOUR CHOICE BEFORE TIME EXPIRES:');
+    for (let i = 0; i < this.choices.length; i++) {
+      const c = this.choices[i];
+      const hasItem = !c.requiredItem || (this.state.inventory && this.state.inventory.has(c.requiredItem));
+      if (!hasItem) {
+        this.state.print(`  [${String.fromCharCode(65 + i)}]: ${c.label} (LOCKED - Requires: ${c.requiredItem})`, 'dim');
+      } else {
+        this.state.print(`  [${String.fromCharCode(65 + i)}]: ${c.label} - ${c.description}`, 'bright');
+      }
+    }
+  }
+
+  private startTimer(): void {
+    this.renderCountdown();
+    this.timerId = setInterval(() => {
+      this.timeLeft--;
+      soundEngine.playKeyClick();
+      this.renderCountdown();
+
+      if (this.timeLeft <= 0) {
+        this.handleTimeout();
+      }
+    }, 1000);
+  }
+
+  private renderCountdown(): void {
+    const bars = Math.max(0, this.timeLeft);
+    const filled = '█'.repeat(bars);
+    const empty = '░'.repeat(Math.max(0, this.timeLimitSec - bars));
+    this.state.print(`TIMER: [${filled}${empty}] ${this.timeLeft}s REMAINING`);
+  }
+
+  private handleTimeout(): void {
+    if (this.isResolved) return;
+    this.cleanup();
+    this.isResolved = true;
+
+    soundEngine.playGlitchNoise();
+    this.state.print('\n>>> TIME EXPIRED! HESITATION HAS CONSEQUENCES! <<<', 'danger');
+    this.state.print('You froze in indecision. The thing claws across your back before you break through!', 'danger');
+    this.state.onMistake(2, 'Bandersnatch timer expired');
+    this.state.onSuccess();
+  }
+
+  public handleInput(input: string): boolean {
+    if (this.isResolved) return true;
+    const clean = input.trim().toUpperCase();
+
+    // Determine choice index (A, B, C or 1, 2, 3)
+    let idx = -1;
+    if (clean === 'A' || clean === '1') idx = 0;
+    else if (clean === 'B' || clean === '2') idx = 1;
+    else if (clean === 'C' || clean === '3') idx = 2;
+    else {
+      // Check if typed partial choice label
+      for (let i = 0; i < this.choices.length; i++) {
+        if (clean.includes(this.choices[i].id.toUpperCase()) || clean.includes(this.choices[i].label.toUpperCase())) {
+          idx = i;
+          break;
+        }
+      }
+    }
+
+    if (idx < 0 || idx >= this.choices.length) {
+      this.state.print('Invalid selection! Quick: choose A, B, or C!');
+      return false;
+    }
+
+    const choice = this.choices[idx];
+    if (choice.requiredItem && (!this.state.inventory || !this.state.inventory.has(choice.requiredItem))) {
+      this.state.print(`You do not possess the required item: "${choice.requiredItem}"! Pick another option!`, 'danger');
+      return false;
+    }
+
+    this.cleanup();
+    this.isResolved = true;
+
+    this.state.print(`\n>>> YOU CHOSE: [${choice.label}] <<<`, 'bright');
+    this.state.print(choice.consequence, 'bright');
+
+    if (choice.distanceDelta !== 0 && this.state.onDistanceChange) {
+      this.state.onDistanceChange(choice.distanceDelta);
+      this.state.print(`Distance adjusted by ${choice.distanceDelta > 0 ? '+' : ''}${choice.distanceDelta}!`, 'bright');
+    }
+
+    this.state.onSuccess();
+    return true;
+  }
+
+  private cleanup(): void {
+    if (this.timerId) {
+      clearInterval(this.timerId);
+      this.timerId = null;
     }
   }
 }

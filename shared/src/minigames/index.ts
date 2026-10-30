@@ -3,6 +3,7 @@ export * from './blackjack.js';
 export * from './cipher.js';
 export * from './simon.js';
 export * from './dark_maze.js';
+export * from './bandersnatch.js';
 
 import { ChallengeItem } from '../types.js';
 import { validateWordleParams } from './wordle.js';
@@ -10,6 +11,7 @@ import { validateBlackjackParams } from './blackjack.js';
 import { validateCipherParams } from './cipher.js';
 import { validateSimonParams } from './simon.js';
 import { validateDarkMazeParams } from './dark_maze.js';
+import { validateBandersnatchParams } from './bandersnatch.js';
 
 export function validateChallengeItem(
   challenge: ChallengeItem,
@@ -26,6 +28,8 @@ export function validateChallengeItem(
       return validateSimonParams(challenge.params);
     case 'dark_maze':
       return validateDarkMazeParams(challenge.params);
+    case 'bandersnatch':
+      return validateBandersnatchParams(challenge.params);
     default:
       return { valid: false, error: `Unknown challenge template: ${(challenge as any).template}` };
   }

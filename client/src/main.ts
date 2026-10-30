@@ -18,10 +18,11 @@ import {
   CipherRunner,
   SimonRunner,
   DarkMazeRunner,
+  BandersnatchRunner,
   MinigameState
 } from './minigames/runners.js';
 import { soundEngine } from './audio.js';
-import { RoomRenderer3D } from './canvas3d.js';
+import { DoomViewRenderer } from './doomView.js';
 
 interface HealthData {
   status: 'ok' | 'degraded' | 'error';
@@ -67,8 +68,8 @@ const jumpscareOverlayEl = document.getElementById('jumpscare-overlay') as HTMLE
 const jumpscareArtEl = document.getElementById('jumpscare-art') as HTMLElement;
 const jumpscareTextEl = document.getElementById('jumpscare-text') as HTMLElement;
 
-// 3D Canvas Visualizer
-const renderer3d = new RoomRenderer3D(roomCanvasEl);
+// 2.5D Doom-style Opaque Raycast Canvas Visualizer
+const doomRenderer = new DoomViewRenderer(roomCanvasEl);
 
 // Konami Code Tracker
 const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
@@ -328,12 +329,16 @@ function renderActionPills(room: any): void {
   });
   actionPillsEl.appendChild(lookPill);
 
-  if (inventory.has('ethanol')) {
-    const ethPill = document.createElement('button');
-    ethPill.className = 'action-pill';
-    ethPill.textContent = 'use ethanol';
-    ethPill.addEventListener('click', () => handleCommand('use ethanol'));
-    actionPillsEl.appendChild(ethPill);
+  // Usable item action pills
+  for (const it of inventory) {
+    const itPill = document.createElement('button');
+    itPill.className = 'action-pill';
+    itPill.textContent = `use ${it}`;
+    itPill.addEventListener('click', () => {
+      inputEl.value = `use ${it}`;
+      handleCommand(`use ${it}`);
+    });
+    actionPillsEl.appendChild(itPill);
   }
 }
 
@@ -353,8 +358,8 @@ function enterRoom(roomId: string): void {
     checkpointRoomId = roomId;
   }
 
-  // 3D Camera Forward Transition
-  renderer3d.setRoom(roomId, true);
+  // Doom-style Perspective Step Transition
+  doomRenderer.setRoom(roomId, true);
   roomTitleEl.textContent = `LOCATION // ${room.name}`;
 
   clearNarrative();
@@ -422,6 +427,10 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
     template: challengeToRun.template,
     active: true,
     params: challengeToRun.params,
+    inventory,
+    onDistanceChange: (delta: number) => {
+      updateDistance(distance + delta);
+    },
     print: (txt: string, cls?: string) => {
       const line = document.createElement('div');
       if (cls) line.className = cls;
@@ -458,6 +467,21 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
       break;
     case 'dark_maze':
       activeMinigame = new DarkMazeRunner(state);
+      break;
+    case 'bandersnatch':
+      activeMinigame = new BandersnatchRunner(state);
+      // Populate quick clickable action pills for the choices
+      actionPillsEl.innerHTML = '';
+      ['A', 'B', 'C'].forEach((opt) => {
+        const btn = document.createElement('button');
+        btn.className = 'action-pill';
+        btn.textContent = `CHOICE [ ${opt} ]`;
+        btn.addEventListener('click', () => {
+          inputEl.value = opt;
+          handleCommand(opt);
+        });
+        actionPillsEl.appendChild(btn);
+      });
       break;
     default:
       solvedRooms.add(currentRoomId);
@@ -602,18 +626,55 @@ function handleCommand(raw: string): void {
       break;
     }
 
-    case 'use':
-      if (parsed.item === 'ethanol' && inventory.has('ethanol')) {
+    case 'use': {
+      const it = parsed.item.toLowerCase();
+      if (!inventory.has(it)) {
+        printNarrative(`You do not carry any "${parsed.item}". Check your inventory.`, 'danger');
+        break;
+      }
+
+      if (it === 'ethanol') {
         inventory.delete('ethanol');
         updateDistance(distance + 2);
-        printNarrative('You drink the ethanol. The chemical burn clears your mind. Distance +2!', 'bright');
+        printNarrative('You drink the ethanol. The chemical fire numbs your racing pulse. Distance +2!', 'bright');
         renderActionPills(STORY_ROOMS[currentRoomId]);
-      } else if (parsed.item === 'flashlight' && inventory.has('flashlight')) {
-        printNarrative('The beam flickers, illuminating claw scratches on the ceiling.');
+      } else if (it === 'salt_shaker') {
+        inventory.delete('salt_shaker');
+        updateDistance(distance + 2);
+        printNarrative('You pour a clean white line of coarse mineral salt across the threshold. A sharp hiss rises as unseen claws recoil from the ward! Distance +2!', 'bright');
+        renderActionPills(STORY_ROOMS[currentRoomId]);
+      } else if (it === 'chalk') {
+        inventory.delete('chalk');
+        updateDistance(distance + 2);
+        printNarrative('You scrape the chalk across the floor, drawing an elder binding ward. The temperature drops as the sigil glows, halting the monster advance! Distance +2!', 'bright');
+        renderActionPills(STORY_ROOMS[currentRoomId]);
+      } else if (it === 'wrench') {
+        if (currentRoomId === 'basement' || currentRoomId === 'stairwell') {
+          updateDistance(distance + 3);
+          printNarrative('You latch the wrench onto the relief valve and heave. A scalding blast of high-pressure steam engulfs the corridor behind you! Distance +3!', 'bright');
+        } else {
+          updateDistance(distance + 1);
+          printNarrative('You rap the steel wrench hard against the floor pipes. The metallic ringing echoes violently, confusing the beast tracking your scent! Distance +1!', 'bright');
+        }
+      } else if (it === 'iron_key') {
+        if (currentRoomId === 'basement') {
+          inventory.delete('iron_key');
+          updateDistance(distance + 3);
+          printNarrative('You turn the iron key inside the furnace lock. With a heavy clunk, the iron hatch unlocks, revealing an emergency shelter vent! Distance +3!', 'bright');
+          renderActionPills(STORY_ROOMS[currentRoomId]);
+        } else {
+          printNarrative('You inspect the heavy iron key. Its teeth match a heavy padlock in the lower basement.');
+        }
+      } else if (it === 'flashlight') {
+        updateDistance(distance + 1);
+        printNarrative('You sweep the high-intensity flashlight beam into the corners. The blinding beam forces a stalking silhouette back into the rafters! Distance +1. (Also grants +4s decision time in timed dilemmas!)', 'bright');
+      } else if (it === 'journal_page') {
+        printNarrative('You read the blood-spotted journal page: "The beast did not breach the house from outside. Look at the locks. Every deadbolt was turned from the inside. We are what we were running from."', 'bright');
       } else {
-        printNarrative(`You cannot use "${parsed.item}" right now.`);
+        printNarrative(`You examine "${it}", but see no immediate way to apply it here.`);
       }
       break;
+    }
 
     case 'inventory':
       if (inventory.size === 0) {
@@ -812,7 +873,7 @@ themeToggleEl.addEventListener('click', () => {
   isMonochrome = !isMonochrome;
   document.body.classList.toggle('monochrome', isMonochrome);
   themeToggleEl.textContent = isMonochrome ? '[COLOR: MONO]' : '[COLOR: GREEN]';
-  renderer3d.setThemeColor(isMonochrome ? '#ffffff' : '#33ff33');
+  doomRenderer.setMonochrome(isMonochrome);
 });
 
 safeModeToggleEl.addEventListener('click', () => {
