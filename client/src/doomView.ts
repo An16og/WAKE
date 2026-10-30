@@ -13,18 +13,6 @@ export class DoomViewRenderer {
   private isMonochrome: boolean = false;
   private tickCount: number = 0;
 
-  // 8x8 1-bit Stipple Dither Matrix (Classic Macintosh / Atkinson Thresholds)
-  private readonly DITHER_MATRIX_8X8: number[][] = [
-    [ 0, 32,  8, 40,  2, 34, 10, 42],
-    [48, 16, 56, 24, 50, 18, 58, 26],
-    [12, 44,  4, 36, 14, 46,  6, 38],
-    [60, 28, 52, 20, 62, 30, 54, 22],
-    [ 3, 35, 11, 43,  1, 33,  9, 41],
-    [51, 19, 59, 27, 49, 17, 57, 25],
-    [15, 47,  7, 39, 13, 45,  5, 37],
-    [63, 31, 55, 23, 61, 29, 53, 21]
-  ];
-
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -38,7 +26,7 @@ export class DoomViewRenderer {
   }
 
   private resize(): void {
-    // Render at crisp retro resolution (e.g. 320x180) then scale up without antialiasing
+    // Render at crisp retro resolution (320x180) then scale up cleanly with image-rendering: pixelated
     this.canvas.width = 320;
     this.canvas.height = 180;
   }
@@ -71,7 +59,7 @@ export class DoomViewRenderer {
         this.isTransitioning = false;
         this.transitionFrame = 0;
       }
-    }, 90);
+    }, 110);
   }
 
   private startLoop(): void {
@@ -88,337 +76,840 @@ export class DoomViewRenderer {
     if (this.transitionTimer) clearInterval(this.transitionTimer);
   }
 
+  // ==========================================
+  // 1-BIT DRAWING PRIMITIVES & MACINTOSH STIPPLE
+  // ==========================================
+
+  private setPixel(buf: Uint8Array, w: number, h: number, x: number, y: number, v: 0 | 1): void {
+    x = Math.floor(x);
+    y = Math.floor(y);
+    if (x >= 0 && x < w && y >= 0 && y < h) {
+      buf[y * w + x] = v;
+    }
+  }
+
+  private drawHLine(buf: Uint8Array, w: number, h: number, x: number, y: number, len: number, v: 0 | 1): void {
+    x = Math.floor(x);
+    y = Math.floor(y);
+    len = Math.floor(len);
+    if (y < 0 || y >= h) return;
+    const startX = Math.max(0, x);
+    const endX = Math.min(w - 1, x + len);
+    for (let curX = startX; curX <= endX; curX++) {
+      buf[y * w + curX] = v;
+    }
+  }
+
+  private drawVLine(buf: Uint8Array, w: number, h: number, x: number, y: number, len: number, v: 0 | 1): void {
+    x = Math.floor(x);
+    y = Math.floor(y);
+    len = Math.floor(len);
+    if (x < 0 || x >= w) return;
+    const startY = Math.max(0, y);
+    const endY = Math.min(h - 1, y + len);
+    for (let curY = startY; curY <= endY; curY++) {
+      buf[curY * w + x] = v;
+    }
+  }
+
+  private drawLine(
+    buf: Uint8Array,
+    w: number,
+    h: number,
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    v: 0 | 1,
+    thick: number = 1
+  ): void {
+    x0 = Math.floor(x0);
+    y0 = Math.floor(y0);
+    x1 = Math.floor(x1);
+    y1 = Math.floor(y1);
+
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+
+    while (true) {
+      for (let tx = 0; tx < thick; tx++) {
+        for (let ty = 0; ty < thick; ty++) {
+          this.setPixel(buf, w, h, x0 + tx, y0 + ty, v);
+        }
+      }
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x0 += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
+  }
+
+  private drawSolidRect(buf: Uint8Array, w: number, h: number, rx: number, ry: number, rw: number, rh: number, v: 0 | 1): void {
+    rx = Math.floor(rx);
+    ry = Math.floor(ry);
+    rw = Math.floor(rw);
+    rh = Math.floor(rh);
+    for (let y = ry; y < ry + rh; y++) {
+      this.drawHLine(buf, w, h, rx, y, rw - 1, v);
+    }
+  }
+
+  private drawOutlineRect(
+    buf: Uint8Array,
+    w: number,
+    h: number,
+    rx: number,
+    ry: number,
+    rw: number,
+    rh: number,
+    v: 0 | 1,
+    thickness: number = 1
+  ): void {
+    rx = Math.floor(rx);
+    ry = Math.floor(ry);
+    rw = Math.floor(rw);
+    rh = Math.floor(rh);
+    for (let t = 0; t < thickness; t++) {
+      this.drawHLine(buf, w, h, rx, ry + t, rw - 1, v);
+      this.drawHLine(buf, w, h, rx, ry + rh - 1 - t, rw - 1, v);
+      this.drawVLine(buf, w, h, rx + t, ry, rh - 1, v);
+      this.drawVLine(buf, w, h, rx + rw - 1 - t, ry, rh - 1, v);
+    }
+  }
+
+  private drawCircle(
+    buf: Uint8Array,
+    w: number,
+    h: number,
+    cx: number,
+    cy: number,
+    r: number,
+    fill: boolean = false,
+    outline: boolean = true
+  ): void {
+    cx = Math.floor(cx);
+    cy = Math.floor(cy);
+    r = Math.floor(r);
+    const r2 = r * r;
+    const innerR2 = Math.max(0, (r - 1.4) * (r - 1.4));
+
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const d2 = dx * dx + dy * dy;
+        const px = cx + dx;
+        const py = cy + dy;
+        if (fill && d2 <= r2) {
+          this.setPixel(buf, w, h, px, py, 1);
+        } else if (outline && d2 <= r2 && d2 >= innerR2) {
+          this.setPixel(buf, w, h, px, py, 1);
+        }
+      }
+    }
+  }
+
+  private drawDitherRect(
+    buf: Uint8Array,
+    w: number,
+    h: number,
+    rx: number,
+    ry: number,
+    rw: number,
+    rh: number,
+    pattern: 'checkered50' | 'stipple25' | 'stipple12' | 'diagHatch' | 'horiz' | 'vert'
+  ): void {
+    rx = Math.floor(rx);
+    ry = Math.floor(ry);
+    rw = Math.floor(rw);
+    rh = Math.floor(rh);
+
+    for (let y = ry; y < ry + rh; y++) {
+      if (y < 0 || y >= h) continue;
+      for (let x = rx; x < rx + rw; x++) {
+        if (x < 0 || x >= w) continue;
+        let on = false;
+        switch (pattern) {
+          case 'checkered50':
+            on = (x + y) % 2 === 0;
+            break;
+          case 'stipple25':
+            on = (x % 2 === 0) && (y % 2 === 0) && (((x >> 1) + (y >> 1)) % 2 === 0);
+            break;
+          case 'stipple12':
+            on = (x % 4 === 0) && (y % 4 === 0) && (((x >> 2) + (y >> 2)) % 2 === 0);
+            break;
+          case 'diagHatch':
+            on = (x + y) % 4 === 0;
+            break;
+          case 'horiz':
+            on = y % 3 === 0;
+            break;
+          case 'vert':
+            on = x % 3 === 0;
+            break;
+        }
+        if (on) {
+          buf[y * w + x] = 1;
+        }
+      }
+    }
+  }
+
+  // ==========================================
+  // MASTER RENDER PIPELINE
+  // ==========================================
+
   private draw(): void {
     const w = this.canvas.width;
     const h = this.canvas.height;
-    const cx = w / 2;
-    const cy = h / 2;
+    const cx = Math.floor(w / 2);
+    const cy = Math.floor(h / 2);
 
     const imgData = this.ctx.createImageData(w, h);
     const data = imgData.data;
 
-    // 1-Bit Palette: pure black vs pure white (or pure phosphor green)
+    // Palette: pure high-contrast black vs white (or green phosphor)
     const onR = this.isMonochrome ? 255 : 51;
     const onG = this.isMonochrome ? 255 : 255;
     const onB = this.isMonochrome ? 255 : 51;
 
-    // Transition zoom and head-bob offsets across the 4 frames
-    let zoomFactor = 1.0;
+    // 1-Bit pixel buffer (0 = Pitch Black, 1 = Stark Foreground)
+    const buf = new Uint8Array(w * h);
+
+    // Frame sequence: 0, 1, 2, 3
+    // In transition: use transitionFrame
+    // In idle: subtle 2-frame breath loop (0 vs 1 every 60 ticks)
+    const activeFrame = this.isTransitioning
+      ? this.transitionFrame
+      : (Math.floor(this.tickCount / 40) % 2 === 0 ? 0 : 1);
+
+    // Zoom and camera bobbing for the 4-frame retro animation sequence
+    let zoom = 1.0;
     let bobY = 0;
 
     if (this.isTransitioning) {
-      // Frame 0: zoom 1.0
-      // Frame 1: zoom 1.35, bob down
-      // Frame 2: zoom 1.8, threshold flash
-      // Frame 3: zoom 1.15, settling
       if (this.transitionFrame === 1) {
-        zoomFactor = 1.35;
-        bobY = 4;
+        zoom = 1.18;
+        bobY = 3;
       } else if (this.transitionFrame === 2) {
-        zoomFactor = 1.75;
+        zoom = 1.45;
         bobY = -2;
       } else if (this.transitionFrame === 3) {
-        zoomFactor = 1.15;
+        zoom = 1.06;
         bobY = 1;
       }
-    } else {
-      // Subtle 1-pixel breathing idle
-      bobY = Math.sin(this.tickCount * 0.04) > 0.7 ? 1 : 0;
     }
 
-    // Rasterize 2.5D Room into Intensity Buffer (0 = Pitch Black, 64 = Stark White)
-    const intensityBuffer = new Uint8Array(w * h);
+    // 1. Draw Architectural 2.5D Room Perspective
+    this.renderArchitecture(buf, w, h, cx, cy + bobY, zoom);
 
-    this.renderRoomGeometry(this.currentRoomId, w, h, cx, cy + bobY, zoomFactor, intensityBuffer);
+    // 2. Draw Highly-Defined 1-Bit Subject Asset for Active Room
+    this.renderRoomSubject(this.currentRoomId, buf, w, h, cx, cy + bobY, zoom, activeFrame);
 
-    // Apply Heavy 1-bit Atkinson / Macintosh Stipple Dithering
-    for (let y = 0; y < h; y++) {
-      const yMod = y & 7;
-      for (let x = 0; x < w; x++) {
-        const idx = y * w + x;
-        const val = intensityBuffer[idx];
-        const threshold = this.DITHER_MATRIX_8X8[yMod][x & 7];
-
-        const pixelOn = val > threshold;
-        const pixelIdx = idx * 4;
-
-        if (pixelOn) {
-          data[pixelIdx] = onR;
-          data[pixelIdx + 1] = onG;
-          data[pixelIdx + 2] = onB;
-          data[pixelIdx + 3] = 255;
-        } else {
-          data[pixelIdx] = 0;
-          data[pixelIdx + 1] = 0;
-          data[pixelIdx + 2] = 0;
-          data[pixelIdx + 3] = 255;
+    // 3. Frame 2: Threshold transition flash (invert pixels on burst lines)
+    if (this.isTransitioning && this.transitionFrame === 2) {
+      for (let y = 0; y < h; y += 2) {
+        for (let x = 0; x < w; x++) {
+          const idx = y * w + x;
+          buf[idx] = buf[idx] === 1 ? 0 : 1;
         }
+      }
+    }
+
+    // 4. Rasterize 1-Bit Buffer to Canvas
+    for (let i = 0; i < buf.length; i++) {
+      const pixelIdx = i * 4;
+      if (buf[i] === 1) {
+        data[pixelIdx] = onR;
+        data[pixelIdx + 1] = onG;
+        data[pixelIdx + 2] = onB;
+        data[pixelIdx + 3] = 255;
+      } else {
+        data[pixelIdx] = 0;
+        data[pixelIdx + 1] = 0;
+        data[pixelIdx + 2] = 0;
+        data[pixelIdx + 3] = 255;
       }
     }
 
     this.ctx.putImageData(imgData, 0, 0);
   }
 
-  private renderRoomGeometry(
+  // ==========================================
+  // ARCHITECTURAL 2.5D BOUNDS
+  // ==========================================
+
+  private renderArchitecture(buf: Uint8Array, w: number, h: number, cx: number, cy: number, zoom: number): void {
+    // Clean, crisp perspective tunnel
+    const halfW = Math.floor((w * 0.28) * zoom);
+    const halfH = Math.floor((h * 0.28) * zoom);
+
+    const leftX = cx - halfW;
+    const rightX = cx + halfW;
+    const topY = cy - halfH;
+    const botY = cy + halfH;
+
+    // Corner perspective diagonals
+    this.drawLine(buf, w, h, 0, 0, leftX, topY, 1, 2);
+    this.drawLine(buf, w, h, w - 1, 0, rightX, topY, 1, 2);
+    this.drawLine(buf, w, h, 0, h - 1, leftX, botY, 1, 2);
+    this.drawLine(buf, w, h, w - 1, h - 1, rightX, botY, 1, 2);
+
+    // Back wall boundary rectangle
+    this.drawOutlineRect(buf, w, h, leftX, topY, rightX - leftX, botY - topY, 1, 2);
+
+    // Left wall: vertical panel seams
+    for (let x = 16; x < leftX; x += 24) {
+      const topYAtX = (topY / leftX) * x;
+      const botYAtX = h - 1 - ((h - 1 - botY) / leftX) * x;
+      this.drawLine(buf, w, h, x, topYAtX, x, botYAtX, 1, 1);
+    }
+
+    // Right wall: vertical panel seams
+    for (let x = rightX + 24; x < w - 8; x += 24) {
+      const t = (w - 1 - x) / Math.max(1, w - 1 - rightX);
+      const topYAtX = topY * (1 - t);
+      const botYAtX = h - 1 - (h - 1 - botY) * (1 - t);
+      this.drawLine(buf, w, h, x, topYAtX, x, botYAtX, 1, 1);
+    }
+
+    // Floorboards: crisp 1-point perspective radiating slats
+    const floorSlats = 8;
+    for (let s = 1; s < floorSlats; s++) {
+      const startX = leftX + Math.floor((rightX - leftX) * (s / floorSlats));
+      const endX = Math.floor(w * (s / floorSlats));
+      this.drawLine(buf, w, h, startX, botY, endX, h - 1, 1, 1);
+    }
+
+    // Floorboard horizontal planks
+    for (let y = botY + 12; y < h; y += 18) {
+      const t = (y - botY) / Math.max(1, h - botY);
+      const startX = leftX - Math.floor(leftX * t);
+      const len = (rightX + Math.floor((w - rightX) * t)) - startX;
+      this.drawHLine(buf, w, h, startX, y, len, 1);
+    }
+
+    // Ceiling: slatted timber rafters
+    for (let y = 6; y < topY; y += 14) {
+      const t = y / Math.max(1, topY);
+      const startX = Math.floor(leftX * t);
+      const endX = w - startX;
+      this.drawHLine(buf, w, h, startX, y, endX - startX, 1);
+    }
+  }
+
+  // ==========================================
+  // HANDCRAFTED 1-BIT ROOM SUBJECT ASSETS
+  // ==========================================
+
+  private renderRoomSubject(
     roomId: string,
+    buf: Uint8Array,
     w: number,
     h: number,
     cx: number,
     cy: number,
     zoom: number,
-    buf: Uint8Array
-  ): void {
-    // 2.5D Doom Raycast Opaque Perspective Bounds
-    const halfW = (w * 0.22) * zoom;
-    const halfH = (h * 0.22) * zoom;
-
-    const leftWallX = Math.floor(cx - halfW);
-    const rightWallX = Math.floor(cx + halfW);
-    const topWallY = Math.floor(cy - halfH);
-    const botWallY = Math.floor(cy + halfH);
-
-    // 1. Opaque Left & Right Walls
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = y * w + x;
-
-        // Outside back wall bounds = Left/Right walls, ceiling, or floor
-        if (x < leftWallX) {
-          // Left Wall: intensity scales from foreground (52) to depth (16)
-          const t = x / Math.max(1, leftWallX);
-          const wallIntensity = Math.floor(54 - t * 38);
-          // Panel vertical seams every 16 pixels
-          const isSeam = (x % 14 === 0) || (x === leftWallX - 1);
-          buf[idx] = isSeam ? 64 : wallIntensity;
-        } else if (x > rightWallX) {
-          // Right Wall
-          const t = (w - x) / Math.max(1, w - rightWallX);
-          const wallIntensity = Math.floor(54 - t * 38);
-          const isSeam = ((w - x) % 14 === 0) || (x === rightWallX);
-          buf[idx] = isSeam ? 64 : wallIntensity;
-        } else if (y < topWallY) {
-          // Ceiling: Recessed stipple slats
-          const isRafter = (y % 10 === 0);
-          buf[idx] = isRafter ? 35 : 12;
-        } else if (y > botWallY) {
-          // Floor: Perspective slats
-          const isTileLine = (y % 12 === 0);
-          buf[idx] = isTileLine ? 42 : 18;
-        } else {
-          // Back Wall Base (Center frame)
-          buf[idx] = 22;
-        }
-      }
-    }
-
-    // 2. Back Doorway Arch
-    const doorW = Math.floor(halfW * 0.85);
-    const doorH = Math.floor(halfH * 1.55);
-    const doorLeft = Math.floor(cx - doorW / 2);
-    const doorRight = Math.floor(cx + doorW / 2);
-    const doorTop = Math.floor(botWallY - doorH);
-
-    for (let y = doorTop; y < botWallY; y++) {
-      for (let x = doorLeft; x < doorRight; x++) {
-        if (x >= 0 && x < w && y >= 0 && y < h) {
-          // Doorway frame border
-          if (x === doorLeft || x === doorRight - 1 || y === doorTop) {
-            buf[y * w + x] = 64; // Stark white border
-          } else {
-            buf[y * w + x] = 4; // Pitch black void inside doorway
-          }
-        }
-      }
-    }
-
-    // 3. Room-Specific 1-Bit Pixel Art Props
-    this.renderSubject1Bit(roomId, w, h, cx, cy, botWallY, doorLeft, doorRight, doorTop, buf);
-  }
-
-  private renderSubject1Bit(
-    roomId: string,
-    w: number,
-    h: number,
-    cx: number,
-    _cy: number,
-    botWallY: number,
-    doorLeft: number,
-    doorRight: number,
-    doorTop: number,
-    buf: Uint8Array
+    frame: number
   ): void {
     switch (roomId) {
-      case 'bedroom': {
-        // Stark dithered Bed silhouette on the left foreground
-        const bedW = 55;
-        const bedH = 32;
-        const bedX = 8;
-        const bedY = h - bedH - 4;
-        for (let y = bedY; y < bedY + bedH; y++) {
-          for (let x = bedX; x < bedX + bedW; x++) {
-            if (x < w && y < h) {
-              const isPillow = (x > bedX + 4 && x < bedX + 16 && y > bedY + 4 && y < bedY + 12);
-              const isFrame = (x === bedX || x === bedX + bedW - 1 || y === bedY);
-              buf[y * w + x] = isFrame ? 64 : isPillow ? 58 : 34;
-            }
-          }
-        }
-
-        // Barred Window on Back Wall Left
-        const winX = doorLeft - 32;
-        const winY = doorTop + 4;
-        const winW = 22;
-        const winH = 26;
-        for (let y = winY; y < winY + winH; y++) {
-          for (let x = winX; x < winX + winW; x++) {
-            if (x >= 0 && x < w && y >= 0 && y < h) {
-              const isBorder = (x === winX || x === winX + winW - 1 || y === winY || y === winY + winH - 1);
-              const isBar = (x === winX + 11) || (y === winY + 13);
-              buf[y * w + x] = (isBorder || isBar) ? 64 : 2;
-            }
-          }
-        }
+      case 'bedroom':
+        this.renderBedroom(buf, w, h, cx, cy, zoom, frame);
         break;
-      }
-
-      case 'hallway': {
-        // Swinging Overhead Light Fixture
-        const wireX = cx;
-        const bulbY = doorTop - 12;
-        for (let y = 0; y < bulbY; y++) {
-          buf[y * w + wireX] = 64;
-        }
-        // Bulb
-        for (let dy = -3; dy <= 3; dy++) {
-          for (let dx = -3; dx <= 3; dx++) {
-            if (dx * dx + dy * dy <= 9) {
-              buf[(bulbY + dy) * w + (wireX + dx)] = 64;
-            }
-          }
-        }
+      case 'hallway':
+        this.renderHallway(buf, w, h, cx, cy, zoom, frame);
         break;
-      }
-
-      case 'kitchen': {
-        // Table in center foreground with rusted knife
-        const tabW = 90;
-        const tabH = 24;
-        const tabX = cx - tabW / 2;
-        const tabY = h - tabH - 12;
-
-        for (let y = tabY; y < tabY + tabH; y++) {
-          for (let x = tabX; x < tabX + tabW; x++) {
-            if (x >= 0 && x < w && y >= 0 && y < h) {
-              const isBorder = (x === tabX || x === tabX + tabW - 1 || y === tabY || y === tabY + 6);
-              buf[y * w + x] = isBorder ? 64 : 28;
-            }
-          }
-        }
-        // Table legs
-        for (let y = tabY + tabH; y < h - 2; y++) {
-          buf[y * w + (tabX + 4)] = 64;
-          buf[y * w + (tabX + tabW - 5)] = 64;
-        }
-        // Knife on table
-        for (let k = 0; k < 12; k++) {
-          buf[(tabY + 3) * w + (cx - 6 + k)] = 64;
-        }
+      case 'kitchen':
+        this.renderKitchen(buf, w, h, cx, cy, zoom, frame);
         break;
-      }
-
-      case 'stairwell': {
-        // 1-Bit Descending Stair Tread Steps
-        let sY = doorTop + 6;
-        const sH = Math.floor((botWallY - doorTop - 6) / 5);
-        for (let s = 0; s < 5; s++) {
-          for (let y = sY; y < sY + sH; y++) {
-            for (let x = doorLeft + 2; x < doorRight - 2; x++) {
-              if (x >= 0 && x < w && y >= 0 && y < h) {
-                const isTread = (y === sY);
-                buf[y * w + x] = isTread ? 64 : (s % 2 === 0 ? 30 : 12);
-              }
-            }
-          }
-          sY += sH;
-        }
+      case 'stairwell':
+        this.renderStairwell(buf, w, h, cx, cy, zoom, frame);
         break;
-      }
-
-      case 'basement': {
-        // Iron Furnace in Center
-        const fnW = 46;
-        const fnH = 48;
-        const fnX = cx - fnW / 2;
-        const fnY = botWallY - fnH;
-
-        for (let y = fnY; y < fnY + fnH; y++) {
-          for (let x = fnX; x < fnX + fnW; x++) {
-            if (x >= 0 && x < w && y >= 0 && y < h) {
-              const isBorder = (x === fnX || x === fnX + fnW - 1 || y === fnY);
-              const isGrate = (y > fnY + 22 && y < fnY + 38 && x > fnX + 8 && x < fnX + fnW - 8);
-              buf[y * w + x] = isBorder ? 64 : isGrate ? ((x % 3 === 0) ? 64 : 4) : 32;
-            }
-          }
-        }
-        // Steam pipes across ceiling
-        for (let x = 0; x < w; x++) {
-          buf[18 * w + x] = 64;
-          buf[20 * w + x] = 64;
-        }
+      case 'basement':
+        this.renderBasement(buf, w, h, cx, cy, zoom, frame);
         break;
-      }
-
-      case 'corridor': {
-        // Ribcage Biological Arches
-        for (let a = doorTop - 8; a < botWallY; a += 14) {
-          for (let x = doorLeft - 8; x <= doorRight + 8; x++) {
-            const dy = Math.sin(((x - (doorLeft - 8)) / (doorRight - doorLeft + 16)) * Math.PI) * 10;
-            const py = Math.floor(a - dy);
-            if (py >= 0 && py < h && x >= 0 && x < w) {
-              buf[py * w + x] = 64;
-            }
-          }
-        }
+      case 'corridor':
+        this.renderCorridor(buf, w, h, cx, cy, zoom, frame);
         break;
-      }
-
-      case 'mirror_room': {
-        // Mirror on Pedestal with Twitching Silhouette
-        const mirW = 42;
-        const mirH = 62;
-        const mirX = cx - mirW / 2;
-        const mirY = botWallY - mirH - 6;
-
-        for (let y = mirY; y < mirY + mirH; y++) {
-          for (let x = mirX; x < mirX + mirW; x++) {
-            if (x >= 0 && x < w && y >= 0 && y < h) {
-              const isBorder = (x === mirX || x === mirX + mirW - 1 || y === mirY || y === mirY + mirH - 1);
-              buf[y * w + x] = isBorder ? 64 : 16;
-            }
-          }
-        }
-
-        // Dark Humanoid Silhouette in Mirror
-        const headCX = cx;
-        const headCY = mirY + 16;
-        for (let dy = -6; dy <= 6; dy++) {
-          for (let dx = -6; dx <= 6; dx++) {
-            if (dx * dx + dy * dy <= 36) {
-              buf[(headCY + dy) * w + (headCX + dx)] = 2; // Dark silhouette
-            }
-          }
-        }
-        // Shoulders
-        for (let y = headCY + 7; y < mirY + mirH - 4; y++) {
-          for (let x = cx - 12; x <= cx + 12; x++) {
-            buf[y * w + x] = 2;
-          }
-        }
-        // Glowing beast eye in reflection
-        buf[(headCY - 1) * w + (headCX - 2)] = 64;
-        buf[(headCY - 1) * w + (headCX + 2)] = 64;
+      case 'mirror_room':
+        this.renderMirrorRoom(buf, w, h, cx, cy, zoom, frame);
         break;
-      }
+      default:
+        this.renderBedroom(buf, w, h, cx, cy, zoom, frame);
+        break;
+    }
+  }
+
+  // ------------------------------------------
+  // ROOM 1: BEDROOM
+  // Subject: Victorian 4-Poster Unmade Bed & Barred Gothic Window
+  // ------------------------------------------
+  private renderBedroom(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, frame: number): void {
+    // 1. Barred Arched Window on Left Wall
+    const winX = 22;
+    const winY = 24;
+    const winW = 38;
+    const winH = 54;
+
+    this.drawOutlineRect(buf, w, h, winX, winY, winW, winH, 1, 2);
+    // Rounded arch top
+    this.drawLine(buf, w, h, winX, winY + 12, winX + winW / 2, winY, 1, 2);
+    this.drawLine(buf, w, h, winX + winW / 2, winY, winX + winW - 1, winY + 12, 1, 2);
+    // Iron bars
+    this.drawVLine(buf, w, h, winX + 12, winY + 4, winH - 6, 1);
+    this.drawVLine(buf, w, h, winX + 25, winY + 4, winH - 6, 1);
+    this.drawHLine(buf, w, h, winX + 2, winY + 28, winW - 4, 1);
+
+    // Crescent moon outside window in deep black void
+    const moonX = winX + 18;
+    const moonY = winY + 14;
+    this.drawCircle(buf, w, h, moonX, moonY, 6, false, true);
+    this.drawCircle(buf, w, h, moonX + 2, moonY - 1, 5, false, true);
+
+    // Diagonal moonbeam stipple ray across the floor
+    for (let rY = winY + winH; rY < h - 10; rY += 3) {
+      const t = (rY - (winY + winH)) / (h - winY - winH);
+      const rayX = Math.floor((winX + 16) + t * 90);
+      this.drawHLine(buf, w, h, rayX, rY, 26, 1);
+    }
+
+    // 2. Heavy Victorian Four-Poster Unmade Bed (Center/Foreground)
+    const bedX = cx - 60;
+    const bedY = cy + 6;
+    const bedW = 120;
+    const bedH = 68;
+
+    // Headboard (High arched wooden back with carved molding)
+    this.drawOutlineRect(buf, w, h, bedX + 16, bedY - 32, bedW - 32, 34, 1, 2);
+    this.drawDitherRect(buf, w, h, bedX + 18, bedY - 30, bedW - 36, 14, 'stipple25');
+    this.drawLine(buf, w, h, bedX + 16, bedY - 32, cx, bedY - 44, 1, 2);
+    this.drawLine(buf, w, h, cx, bedY - 44, bedX + bedW - 16, bedY - 32, 1, 2);
+
+    // Left Bedpost (Tall carved post with round decorative finial)
+    this.drawVLine(buf, w, h, bedX + 12, bedY - 48, bedH + 48, 1);
+    this.drawVLine(buf, w, h, bedX + 14, bedY - 48, bedH + 48, 1);
+    this.drawCircle(buf, w, h, bedX + 13, bedY - 50, 4, true, true);
+
+    // Right Bedpost
+    this.drawVLine(buf, w, h, bedX + bedW - 14, bedY - 48, bedH + 48, 1);
+    this.drawVLine(buf, w, h, bedX + bedW - 12, bedY - 48, bedH + 48, 1);
+    this.drawCircle(buf, w, h, bedX + bedW - 13, bedY - 50, 4, true, true);
+
+    // Mattress platform
+    this.drawSolidRect(buf, w, h, bedX + 16, bedY, bedW - 32, 14, 0);
+    this.drawOutlineRect(buf, w, h, bedX + 16, bedY, bedW - 32, 14, 1, 2);
+
+    // Pillow with hollow head impression
+    this.drawOutlineRect(buf, w, h, bedX + 24, bedY - 8, 32, 12, 1, 2);
+    this.drawDitherRect(buf, w, h, bedX + 30, bedY - 5, 18, 6, 'checkered50');
+
+    // Rumpled Unmade Quilt (heavy folds dangling over the mattress)
+    this.drawOutlineRect(buf, w, h, bedX + 8, bedY + 12, bedW - 16, bedH - 24, 1, 2);
+    this.drawDitherRect(buf, w, h, bedX + 10, bedY + 14, bedW - 20, 24, 'diagHatch');
+
+    // Fold creases in the unmade sheets
+    this.drawLine(buf, w, h, bedX + 24, bedY + 16, bedX + 48, bedY + 36, 1, 2);
+    this.drawLine(buf, w, h, bedX + 54, bedY + 18, bedX + 82, bedY + 40, 1, 2);
+    this.drawLine(buf, w, h, bedX + 78, bedY + 14, bedX + 104, bedY + 34, 1, 2);
+
+    // Bed legs
+    this.drawSolidRect(buf, w, h, bedX + 12, bedY + bedH - 12, 6, 16, 1);
+    this.drawSolidRect(buf, w, h, bedX + bedW - 18, bedY + bedH - 12, 6, 16, 1);
+
+    // Frame 1 animation: Dark clawed shadow hand reaches 14px out from under bed
+    if (frame === 1) {
+      const clawX = bedX + 38;
+      const clawY = bedY + bedH - 4;
+      this.drawSolidRect(buf, w, h, clawX, clawY, 18, 4, 1);
+      // Fingers
+      this.drawLine(buf, w, h, clawX + 18, clawY, clawX + 26, clawY - 3, 1, 2);
+      this.drawLine(buf, w, h, clawX + 18, clawY + 2, clawX + 28, clawY + 2, 1, 2);
+      this.drawLine(buf, w, h, clawX + 18, clawY + 4, clawX + 25, clawY + 7, 1, 2);
+    }
+  }
+
+  // ------------------------------------------
+  // ROOM 2: HALLWAY
+  // Subject: Hanging Bell Lamp, Light Beam & Gouged Portrait
+  // ------------------------------------------
+  private renderHallway(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, frame: number): void {
+    // 1. Gouged Portrait on Left Wall
+    const portX = 28;
+    const portY = cy - 40;
+    const portW = 34;
+    const portH = 48;
+
+    this.drawOutlineRect(buf, w, h, portX, portY, portW, portH, 1, 2);
+    this.drawOutlineRect(buf, w, h, portX + 4, portY + 4, portW - 8, portH - 8, 1, 1);
+    this.drawDitherRect(buf, w, h, portX + 6, portY + 6, portW - 12, portH - 12, 'stipple25');
+
+    // Oval face silhouette inside frame
+    const faceX = portX + Math.floor(portW / 2);
+    const faceY = portY + 18;
+    this.drawCircle(buf, w, h, faceX, faceY, 9, false, true);
+
+    // Gouged hollow black eye sockets
+    this.drawSolidRect(buf, w, h, faceX - 5, faceY - 2, 3, 4, 0);
+    this.drawSolidRect(buf, w, h, faceX + 2, faceY - 2, 3, 4, 0);
+
+    // Dripping black tears from sockets down canvas
+    const dripLen = frame === 1 ? 16 : 9;
+    this.drawVLine(buf, w, h, faceX - 4, faceY + 2, dripLen, 1);
+    this.drawVLine(buf, w, h, faceX + 3, faceY + 2, dripLen, 1);
+
+    // 2. Hanging Overhead Industrial Lamp (sways in frame 1)
+    const lampSway = frame === 1 ? 7 : 0;
+    const lampX = cx + lampSway;
+    const lampY = cy - 28;
+
+    // Electrical cord from ceiling
+    this.drawLine(buf, w, h, cx, 0, lampX, lampY, 1, 2);
+
+    // Flared metal lamp shade
+    this.drawLine(buf, w, h, lampX - 16, lampY + 10, lampX + 16, lampY + 10, 1, 2);
+    this.drawLine(buf, w, h, lampX - 6, lampY, lampX - 16, lampY + 10, 1, 2);
+    this.drawLine(buf, w, h, lampX + 6, lampY, lampX + 16, lampY + 10, 1, 2);
+
+    // Bare glowing bulb
+    this.drawCircle(buf, w, h, lampX, lampY + 14, 4, true, true);
+
+    // Stark conical beam of white light illuminating the corridor floor
+    const coneBotW = 110;
+    const coneLeft = lampX - coneBotW / 2;
+    const coneRight = lampX + coneBotW / 2;
+
+    this.drawLine(buf, w, h, lampX - 12, lampY + 12, coneLeft, h - 1, 1, 1);
+    this.drawLine(buf, w, h, lampX + 12, lampY + 12, coneRight, h - 1, 1, 1);
+
+    // Illuminated pool of light on the floor
+    this.drawDitherRect(buf, w, h, coneLeft + 12, h - 36, coneBotW - 24, 30, 'checkered50');
+  }
+
+  // ------------------------------------------
+  // ROOM 3: KITCHEN
+  // Subject: Heavy Butcher Block & Rusted Meat Cleaver
+  // ------------------------------------------
+  private renderKitchen(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, frame: number): void {
+    // 1. Vintage Refrigerator in Background (Right)
+    const frX = cx + 58;
+    const frY = cy - 42;
+    const frW = 42;
+    const frH = 74;
+
+    this.drawOutlineRect(buf, w, h, frX, frY, frW, frH, 1, 2);
+    // Freezer split line
+    this.drawHLine(buf, w, h, frX, frY + 26, frW, 1);
+    // Chrome latch handle
+    this.drawSolidRect(buf, w, h, frX + 6, frY + 14, 3, 8, 1);
+    this.drawSolidRect(buf, w, h, frX + 6, frY + 38, 3, 10, 1);
+
+    // 2. Ceiling Hanging Meat Hooks
+    const hookX1 = cx - 44;
+    this.drawVLine(buf, w, h, hookX1, 0, 32, 1);
+    this.drawLine(buf, w, h, hookX1, 32, hookX1 + 8, 40, 1, 2);
+    this.drawLine(buf, w, h, hookX1 + 8, 40, hookX1 + 2, 44, 1, 2);
+
+    // 3. Massive Heavy Butcher Block Table (Center Foreground)
+    const tabW = 130;
+    const tabH = 64;
+    const tabX = cx - tabW / 2;
+    const tabY = cy + 12;
+
+    // Wooden Block Top Slab (thick timber with woodgrain)
+    this.drawOutlineRect(buf, w, h, tabX, tabY, tabW, 20, 1, 2);
+    this.drawDitherRect(buf, w, h, tabX + 4, tabY + 4, tabW - 8, 12, 'diagHatch');
+
+    // Cross-braced heavy square table legs
+    this.drawSolidRect(buf, w, h, tabX + 10, tabY + 20, 12, tabH - 20, 1);
+    this.drawSolidRect(buf, w, h, tabX + tabW - 22, tabY + 20, 12, tabH - 20, 1);
+    // Cross brace timber
+    this.drawHLine(buf, w, h, tabX + 10, tabY + 42, tabW - 22, 1);
+    this.drawHLine(buf, w, h, tabX + 10, tabY + 44, tabW - 22, 1);
+
+    // 4. Menacing Rusted Meat Cleaver (Jammed deep into center block)
+    const clX = cx - 8;
+    const clY = tabY - 26;
+
+    // Heavy rectangular steel blade angled into wood
+    this.drawOutlineRect(buf, w, h, clX, clY, 32, 28, 1, 2);
+    this.drawDitherRect(buf, w, h, clX + 2, clY + 2, 28, 24, 'stipple25');
+
+    // Notched, jagged blade edge
+    this.drawLine(buf, w, h, clX, clY + 8, clX + 6, clY + 12, 0, 2);
+    this.drawLine(buf, w, h, clX, clY + 18, clX + 8, clY + 22, 0, 2);
+
+    // Wooden handle with rivets
+    this.drawLine(buf, w, h, clX + 32, clY + 4, clX + 54, clY - 14, 1, 4);
+    this.drawCircle(buf, w, h, clX + 38, clY - 1, 2, true, true);
+    this.drawCircle(buf, w, h, clX + 46, clY - 8, 2, true, true);
+
+    // Dripping dark fluid from cleaver tip onto block
+    const dropY = frame === 1 ? tabY + 12 : tabY + 4;
+    this.drawCircle(buf, w, h, clX + 2, dropY, 2, true, true);
+  }
+
+  // ------------------------------------------
+  // ROOM 4: STAIRWELL
+  // Subject: Descending Wooden Stairs, Railing & Claw Scores
+  // ------------------------------------------
+  private renderStairwell(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, frame: number): void {
+    // 1. Plaster Wall with 3 Deep Claw Gouges
+    const clawStartX = cx - 50;
+    const clawStartY = cy - 42;
+    for (let c = 0; c < 3; c++) {
+      const offY = c * 8;
+      this.drawLine(buf, w, h, clawStartX, clawStartY + offY, clawStartX + 38, clawStartY + offY + 18, 1, 2);
+      this.drawLine(buf, w, h, clawStartX + 38, clawStartY + offY + 18, clawStartX + 70, clawStartY + offY + 12, 1, 2);
+    }
+
+    // 2. Steep Wooden Stairs Descending Diagonally into Pitch Black Void
+    const stepCount = 6;
+    const startX = cx - 50;
+    const startY = cy - 8;
+    const stepW = 100;
+    const stepRise = 14;
+
+    for (let i = 0; i < stepCount; i++) {
+      const curY = startY + i * stepRise;
+      const curX = startX + i * 8;
+
+      // Wooden step tread (horizontal)
+      this.drawOutlineRect(buf, w, h, curX, curY, stepW - i * 8, 6, 1, 2);
+      this.drawDitherRect(buf, w, h, curX + 2, curY + 1, stepW - i * 8 - 4, 4, 'checkered50');
+
+      // Step riser (vertical face)
+      this.drawHLine(buf, w, h, curX, curY + 6, stepW - i * 8, 1);
+    }
+
+    // 3. Carved Wooden Banister & Vertical Spindles
+    const banStartX = startX - 4;
+    const banStartY = startY - 26;
+    const banEndX = startX + 54;
+    const banEndY = startY + stepCount * stepRise - 26;
+
+    // Handrail
+    this.drawLine(buf, w, h, banStartX, banStartY, banEndX, banEndY, 1, 3);
+
+    // Vertical spindles
+    for (let s = 0; s < stepCount; s++) {
+      const spX = banStartX + Math.floor((banEndX - banStartX) * (s / (stepCount - 1)));
+      const topSpY = banStartY + Math.floor((banEndY - banStartY) * (s / (stepCount - 1)));
+      const botSpY = startY + s * stepRise;
+      this.drawVLine(buf, w, h, spX, topSpY, botSpY - topSpY, 1);
+    }
+
+    // Heavy Newel Post at the bottom landing
+    this.drawSolidRect(buf, w, h, banEndX - 2, banEndY - 6, 8, 38, 1);
+    this.drawCircle(buf, w, h, banEndX + 2, banEndY - 10, 5, true, true);
+
+    // Frame 1 animation: Shadow claw creeping up step 3
+    if (frame === 1) {
+      const shadowX = startX + 28;
+      const shadowY = startY + 2 * stepRise;
+      this.drawSolidRect(buf, w, h, shadowX, shadowY, 20, 5, 1);
+      this.drawLine(buf, w, h, shadowX + 20, shadowY, shadowX + 28, shadowY - 4, 1, 2);
+      this.drawLine(buf, w, h, shadowX + 20, shadowY + 3, shadowX + 30, shadowY + 2, 1, 2);
+    }
+  }
+
+  // ------------------------------------------
+  // ROOM 5: BASEMENT
+  // Subject: Riveted Cast-Iron Boiler & Fire Grate Mouth
+  // ------------------------------------------
+  private renderBasement(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, frame: number): void {
+    // 1. Crisscrossing Industrial Overhead Steam Pipes
+    this.drawHLine(buf, w, h, 0, 20, w, 1);
+    this.drawHLine(buf, w, h, 0, 24, w, 1);
+    // Pipe flange joints
+    for (let pX = 40; pX < w; pX += 80) {
+      this.drawSolidRect(buf, w, h, pX, 17, 6, 11, 1);
+    }
+
+    // Vertical pressure pipe down to furnace
+    this.drawVLine(buf, w, h, cx + 46, 24, 38, 1);
+    this.drawVLine(buf, w, h, cx + 50, 24, 38, 1);
+    // Valve wheel
+    this.drawCircle(buf, w, h, cx + 48, 44, 7, false, true);
+
+    // 2. Towering Cast-Iron Furnace / Boiler (Center)
+    const fnW = 86;
+    const fnH = 78;
+    const fnX = cx - fnW / 2;
+    const fnY = cy - 14;
+
+    // Domed rounded top
+    this.drawLine(buf, w, h, fnX + 10, fnY, fnX + fnW - 10, fnY, 1, 2);
+    this.drawLine(buf, w, h, fnX, fnY + 16, fnX + 10, fnY, 1, 2);
+    this.drawLine(buf, w, h, fnX + fnW - 10, fnY, fnX + fnW, fnY + 16, 1, 2);
+
+    // Cylindrical iron body
+    this.drawOutlineRect(buf, w, h, fnX, fnY + 16, fnW, fnH - 16, 1, 2);
+    this.drawDitherRect(buf, w, h, fnX + 4, fnY + 18, fnW - 8, 16, 'diagHatch');
+
+    // Round Rivets along boiler seams
+    for (let rX = fnX + 6; rX < fnX + fnW - 6; rX += 10) {
+      this.drawCircle(buf, w, h, rX, fnY + 18, 1, true, true);
+      this.drawCircle(buf, w, h, rX, fnY + fnH - 4, 1, true, true);
+    }
+
+    // Circular dial pressure gauge (needle in the danger red zone)
+    const gaugeX = cx;
+    const gaugeY = fnY + 26;
+    this.drawCircle(buf, w, h, gaugeX, gaugeY, 9, false, true);
+    this.drawLine(buf, w, h, gaugeX, gaugeY, gaugeX + 6, gaugeY - 5, 1, 2);
+
+    // Iron Firebox Hatch (Resembles an open snarling monster mouth)
+    const hatchW = 46;
+    const hatchH = 26;
+    const hatchX = cx - hatchW / 2;
+    const hatchY = fnY + 42;
+
+    this.drawSolidRect(buf, w, h, hatchX, hatchY, hatchW, hatchH, 0);
+    this.drawOutlineRect(buf, w, h, hatchX, hatchY, hatchW, hatchH, 1, 2);
+
+    // Horizontal tooth-like iron grate bars
+    const grateSpread = frame === 1 ? 5 : 4;
+    for (let gY = hatchY + 4; gY < hatchY + hatchH - 2; gY += grateSpread) {
+      this.drawHLine(buf, w, h, hatchX + 2, gY, hatchW - 4, 1);
+    }
+
+    // Glowing hot coals inside grate
+    this.drawDitherRect(buf, w, h, hatchX + 4, hatchY + 6, hatchW - 8, hatchH - 10, 'checkered50');
+
+    // Steam plume puffs out in frame 1
+    if (frame === 1) {
+      this.drawDitherRect(buf, w, h, cx + 54, 38, 24, 14, 'stipple25');
+    }
+  }
+
+  // ------------------------------------------
+  // ROOM 6: CORRIDOR / FLESH VAULT
+  // Subject: Biomechanical Ribcage Arches & Colossal Biological Eye
+  // ------------------------------------------
+  private renderCorridor(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, frame: number): void {
+    // 1. Colossal Curved Bone Ribcage Arches Overhead
+    const archCount = 5;
+    for (let a = 0; a < archCount; a++) {
+      const archY = 16 + a * 20;
+      const spreadX = 40 + a * 18;
+
+      // Left rib bone curving from floor to ceiling
+      this.drawLine(buf, w, h, cx - spreadX, cy + 50, cx - spreadX + 24, archY + 12, 1, 3);
+      this.drawLine(buf, w, h, cx - spreadX + 24, archY + 12, cx, archY, 1, 3);
+
+      // Right rib bone
+      this.drawLine(buf, w, h, cx + spreadX, cy + 50, cx + spreadX - 24, archY + 12, 1, 3);
+      this.drawLine(buf, w, h, cx + spreadX - 24, archY + 12, cx, archY, 1, 3);
+
+      // Vertebra joint knot
+      this.drawCircle(buf, w, h, cx, archY, 4, true, true);
+    }
+
+    // Glistening vein clusters along the organic walls
+    for (let v = 0; v < 4; v++) {
+      this.drawDitherRect(buf, w, h, 20 + v * 12, cy - 20 + v * 8, 16, 12, 'stipple25');
+      this.drawDitherRect(buf, w, h, w - 36 - v * 12, cy - 20 + v * 8, 16, 12, 'stipple25');
+    }
+
+    // 2. Colossal Biological Eye at the End of the Tunnel
+    const eyeCX = cx;
+    const eyeCY = cy;
+    const eyeR = 22;
+
+    // Heavy organic eye frame with fibrous tendrils
+    this.drawCircle(buf, w, h, eyeCX, eyeCY, eyeR + 4, false, true);
+    this.drawCircle(buf, w, h, eyeCX, eyeCY, eyeR, true, true);
+
+    // Eyelid slit
+    this.drawLine(buf, w, h, eyeCX - eyeR, eyeCY, eyeCX + eyeR, eyeCY, 0, 2);
+
+    // Iris & Pupil (Dilates wide in frame 1)
+    const pupilW = frame === 1 ? 12 : 6;
+    const pupilH = frame === 1 ? 18 : 22;
+    this.drawSolidRect(buf, w, h, eyeCX - pupilW / 2, eyeCY - pupilH / 2, pupilW, pupilH, 0);
+
+    // Slit pupil white gleam
+    this.drawVLine(buf, w, h, eyeCX, eyeCY - 6, 12, 1);
+
+    // Radiating nerve tendrils spreading onto walls
+    this.drawLine(buf, w, h, eyeCX - eyeR, eyeCY - 6, eyeCX - eyeR - 18, eyeCY - 16, 1, 2);
+    this.drawLine(buf, w, h, eyeCX - eyeR, eyeCY + 8, eyeCX - eyeR - 22, eyeCY + 18, 1, 2);
+    this.drawLine(buf, w, h, eyeCX + eyeR, eyeCY - 6, eyeCX + eyeR + 18, eyeCY - 16, 1, 2);
+    this.drawLine(buf, w, h, eyeCX + eyeR, eyeCY + 8, eyeCX + eyeR + 22, eyeCY + 18, 1, 2);
+  }
+
+  // ------------------------------------------
+  // ROOM 7: MIRROR ROOM
+  // Subject: Gothic Cheval Mirror & Terrifying Demonic Beast Reflection
+  // ------------------------------------------
+  private renderMirrorRoom(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, frame: number): void {
+    // 1. Ornate Gothic Standing Cheval Mirror Frame
+    const mirW = 68;
+    const mirH = 96;
+    const mirX = cx - mirW / 2;
+    const mirY = cy - 36;
+
+    // Arched decorative frame top
+    this.drawOutlineRect(buf, w, h, mirX, mirY + 12, mirW, mirH - 12, 1, 2);
+    this.drawLine(buf, w, h, mirX, mirY + 12, cx, mirY, 1, 2);
+    this.drawLine(buf, w, h, cx, mirY, mirX + mirW, mirY + 12, 1, 2);
+
+    // Carved Gargoyle Claw-Feet on Floor
+    this.drawLine(buf, w, h, mirX - 6, mirY + mirH + 8, mirX + 6, mirY + mirH, 1, 3);
+    this.drawLine(buf, w, h, mirX + mirW + 6, mirY + mirH + 8, mirX + mirW - 6, mirY + mirH, 1, 3);
+
+    // Mirror Glass Surface (Deep void with subtle reflection dither)
+    this.drawSolidRect(buf, w, h, mirX + 4, mirY + 8, mirW - 8, mirH - 12, 0);
+    this.drawDitherRect(buf, w, h, mirX + 6, mirY + 10, mirW - 12, mirH - 16, 'stipple12');
+
+    // 2. Spiderweb Fracture cracking across the glass
+    this.drawLine(buf, w, h, mirX + 8, mirY + 16, cx - 4, cy - 4, 1, 1);
+    this.drawLine(buf, w, h, cx - 4, cy - 4, cx + 18, cy + 22, 1, 1);
+    this.drawLine(buf, w, h, cx - 4, cy - 4, mirX + 48, mirY + 8, 1, 1);
+
+    // 3. Demonic Beast Silhouette Reflection (The Twist: The Player IS The Thing)
+    const headCX = cx;
+    const headCY = cy - 4;
+
+    // Curved beast horns rising from skull
+    this.drawLine(buf, w, h, headCX - 8, headCY - 10, headCX - 22, headCY - 26, 1, 3);
+    this.drawLine(buf, w, h, headCX - 22, headCY - 26, headCX - 16, headCY - 30, 1, 2);
+    this.drawLine(buf, w, h, headCX + 8, headCY - 10, headCX + 22, headCY - 26, 1, 3);
+    this.drawLine(buf, w, h, headCX + 22, headCY - 26, headCX + 16, headCY - 30, 1, 2);
+
+    // Broad demonic head silhouette
+    this.drawSolidRect(buf, w, h, headCX - 14, headCY - 10, 28, 20, 1);
+
+    // Broad hunched shoulders
+    this.drawSolidRect(buf, w, h, headCX - 24, headCY + 10, 48, 28, 1);
+
+    // Piercing glowing slit white beast eyes
+    const eyeFlare = frame === 1 ? 5 : 3;
+    this.drawSolidRect(buf, w, h, headCX - 9, headCY - 4, eyeFlare, 2, 0);
+    this.drawSolidRect(buf, w, h, headCX + 5, headCY - 4, eyeFlare, 2, 0);
+
+    // Snarling razor-toothed grin
+    this.drawHLine(buf, w, h, headCX - 8, headCY + 4, 16, 0);
+    for (let tX = headCX - 6; tX <= headCX + 6; tX += 3) {
+      this.drawVLine(buf, w, h, tX, headCY + 3, 3, 1);
+    }
+
+    // Clawed hands pressed flat against inside of glass
+    const handY = headCY + 22;
+    this.drawSolidRect(buf, w, h, mirX + 8, handY, 10, 8, 1);
+    this.drawSolidRect(buf, w, h, mirX + mirW - 18, handY, 10, 8, 1);
+    // Sharp claw tips
+    for (let f = 0; f < 3; f++) {
+      this.drawVLine(buf, w, h, mirX + 9 + f * 3, handY - 4, 4, 1);
+      this.drawVLine(buf, w, h, mirX + mirW - 17 + f * 3, handY - 4, 4, 1);
     }
   }
 }

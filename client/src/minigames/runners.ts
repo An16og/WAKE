@@ -12,6 +12,7 @@ export interface MinigameState {
   active: boolean;
   params: any;
   inventory?: Set<string>;
+  containerEl?: HTMLElement;
   onSuccess: () => void;
   onMistake: (penaltyDistance: number, mistakeName: string) => void;
   onDistanceChange?: (delta: number) => void;
@@ -380,6 +381,9 @@ export class BandersnatchRunner {
   private timeLeft: number;
   private timerId: any = null;
   private isResolved: boolean = false;
+  private timerDigitsEl: HTMLElement | null = null;
+  private timerFillEl: HTMLElement | null = null;
+  private timerBoxEl: HTMLElement | null = null;
 
   constructor(state: MinigameState) {
     this.state = state;
@@ -392,36 +396,88 @@ export class BandersnatchRunner {
   }
 
   public start(): void {
-    this.state.print('\n=== DYNAMIC SPLIT-SECOND DILEMMA (BANDERSNATCH) ===', 'bright');
-    this.state.print(this.scenario, 'bright');
+    if (this.state.containerEl) {
+      this.state.containerEl.innerHTML = '';
+      const card = document.createElement('div');
+      card.className = 'bandersnatch-container';
 
-    if (this.state.inventory?.has('flashlight')) {
-      this.state.print('[FLASHLIGHT PERK: Illumination grants +4s decision buffer!]', 'bright');
-    }
+      const header = document.createElement('div');
+      header.className = 'bandersnatch-header';
+      header.innerHTML = `<span>SPLIT-SECOND DILEMMA</span><span class="live-indicator">● LIVE COUNTDOWN</span>`;
+      card.appendChild(header);
 
-    this.renderChoices();
-    this.startTimer();
-  }
+      const scenario = document.createElement('div');
+      scenario.className = 'bandersnatch-scenario';
+      scenario.textContent = this.scenario;
+      card.appendChild(scenario);
 
-  private renderChoices(): void {
-    this.state.print('\nMAKE YOUR CHOICE BEFORE TIME EXPIRES:');
-    for (let i = 0; i < this.choices.length; i++) {
-      const c = this.choices[i];
-      const hasItem = !c.requiredItem || (this.state.inventory && this.state.inventory.has(c.requiredItem));
-      if (!hasItem) {
-        this.state.print(`  [${String.fromCharCode(65 + i)}]: ${c.label} (LOCKED - Requires: ${c.requiredItem})`, 'dim');
-      } else {
+      if (this.state.inventory?.has('flashlight')) {
+        const perk = document.createElement('div');
+        perk.className = 'bandersnatch-perk';
+        perk.textContent = '⚡ FLASHLIGHT PERK: Illumination adds +4s decision buffer!';
+        card.appendChild(perk);
+      }
+
+      // Dedicated in-place timer element
+      const timerBox = document.createElement('div');
+      timerBox.className = 'bandersnatch-timer-box';
+      timerBox.innerHTML = `
+        <div class="bandersnatch-timer-header">
+          <span class="bandersnatch-timer-label">DECISION COUNTDOWN</span>
+          <span class="bandersnatch-timer-digits" id="bs-timer-digits">${this.timeLeft}s REMAINING</span>
+        </div>
+        <div class="bandersnatch-progress-track">
+          <div class="bandersnatch-progress-fill" id="bs-timer-fill" style="width: 100%;"></div>
+        </div>
+      `;
+      card.appendChild(timerBox);
+      this.timerBoxEl = timerBox;
+      this.timerDigitsEl = timerBox.querySelector('#bs-timer-digits');
+      this.timerFillEl = timerBox.querySelector('#bs-timer-fill');
+
+      // Clickable Choices List
+      const choicesList = document.createElement('div');
+      choicesList.className = 'bandersnatch-choices-list';
+
+      for (let i = 0; i < this.choices.length; i++) {
+        const c = this.choices[i];
+        const key = String.fromCharCode(65 + i);
+        const hasItem = !c.requiredItem || (this.state.inventory && this.state.inventory.has(c.requiredItem));
+
+        const choiceItem = document.createElement('div');
+        choiceItem.className = `bandersnatch-choice-item ${!hasItem ? 'locked' : ''}`;
+        choiceItem.innerHTML = `
+          <span class="bandersnatch-choice-key">[ ${key} ]</span>
+          <span class="bandersnatch-choice-label">${c.label}</span>
+          <span class="bandersnatch-choice-desc">${hasItem ? c.description : `(LOCKED: Requires ${c.requiredItem})`}</span>
+        `;
+        if (hasItem) {
+          choiceItem.addEventListener('click', () => {
+            this.handleInput(key);
+          });
+        }
+        choicesList.appendChild(choiceItem);
+      }
+      card.appendChild(choicesList);
+      this.state.containerEl.appendChild(card);
+    } else {
+      this.state.print('\n=== DYNAMIC SPLIT-SECOND DILEMMA (BANDERSNATCH) ===', 'bright');
+      this.state.print(this.scenario, 'bright');
+      for (let i = 0; i < this.choices.length; i++) {
+        const c = this.choices[i];
         this.state.print(`  [${String.fromCharCode(65 + i)}]: ${c.label} - ${c.description}`, 'bright');
       }
     }
+
+    this.startTimer();
   }
 
   private startTimer(): void {
-    this.renderCountdown();
+    this.updateInPlaceTimer();
     this.timerId = setInterval(() => {
       this.timeLeft--;
       soundEngine.playKeyClick();
-      this.renderCountdown();
+      this.updateInPlaceTimer();
 
       if (this.timeLeft <= 0) {
         this.handleTimeout();
@@ -429,11 +485,25 @@ export class BandersnatchRunner {
     }, 1000);
   }
 
-  private renderCountdown(): void {
+  private updateInPlaceTimer(): void {
     const bars = Math.max(0, this.timeLeft);
     const filled = '█'.repeat(bars);
     const empty = '░'.repeat(Math.max(0, this.timeLimitSec - bars));
-    this.state.print(`TIMER: [${filled}${empty}] ${this.timeLeft}s REMAINING`);
+    const pct = Math.max(0, (this.timeLeft / this.timeLimitSec) * 100);
+
+    if (this.timerDigitsEl) {
+      this.timerDigitsEl.textContent = `[${filled}${empty}] ${this.timeLeft}s REMAINING`;
+    }
+    if (this.timerFillEl) {
+      this.timerFillEl.style.width = `${pct}%`;
+    }
+    if (this.timerBoxEl) {
+      if (this.timeLeft <= 3) {
+        this.timerBoxEl.classList.add('urgent');
+      } else {
+        this.timerBoxEl.classList.remove('urgent');
+      }
+    }
   }
 
   private handleTimeout(): void {

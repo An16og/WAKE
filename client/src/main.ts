@@ -423,6 +423,7 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
     active: true,
     params: challengeToRun.params,
     inventory,
+    containerEl: minigameArenaEl,
     onDistanceChange: (delta: number) => {
       updateDistance(distance + delta);
     },
@@ -430,13 +431,17 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
       const line = document.createElement('div');
       if (cls) line.className = cls;
       line.textContent = txt;
-      minigameArenaEl.appendChild(line);
-      minigameArenaEl.scrollTop = minigameArenaEl.scrollHeight;
+      narrativeOutputEl.appendChild(line);
+      narrativeOutputEl.scrollTop = narrativeOutputEl.scrollHeight;
       appendHistory(txt, cls);
     },
     onSuccess: () => {
       solvedRooms.add(currentRoomId);
       activeMinigame = null;
+      setTimeout(() => {
+        minigameArenaEl.innerHTML = '';
+        minigameArenaEl.classList.add('hidden');
+      }, 1200);
       printNarrative('\n>>> PATH UNSEALED. You can move forward now. <<<', 'bright');
       renderActionPills(STORY_ROOMS[currentRoomId]);
       syncState();

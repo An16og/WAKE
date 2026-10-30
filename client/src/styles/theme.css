@@ -247,6 +247,158 @@ body.monochrome {
   font-size: 19px;
 }
 
+/* Bandersnatch Dynamic Arena & In-place Timer */
+.bandersnatch-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-color);
+  padding: 10px 14px;
+  border-radius: 2px;
+}
+
+.bandersnatch-header {
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  color: var(--fg-bright);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed var(--border-color);
+  padding-bottom: 4px;
+}
+
+.live-indicator {
+  font-size: 14px;
+  color: var(--fg-bright);
+  animation: pulse 1s infinite alternate;
+}
+
+.bandersnatch-scenario {
+  font-size: 19px;
+  line-height: 1.35;
+  color: var(--fg-bright);
+  margin-top: 4px;
+}
+
+.bandersnatch-perk {
+  font-size: 16px;
+  color: var(--fg-bright);
+  background: rgba(0, 255, 65, 0.12);
+  border: 1px solid var(--border-color);
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+
+.bandersnatch-timer-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+  padding: 6px 8px;
+  background: rgba(8, 12, 8, 0.85);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.bandersnatch-timer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 17px;
+  font-family: inherit;
+}
+
+.bandersnatch-timer-label {
+  color: var(--fg-dim);
+  letter-spacing: 0.05em;
+  font-size: 16px;
+}
+
+.bandersnatch-timer-digits {
+  font-weight: bold;
+  font-size: 18px;
+  color: var(--fg-bright);
+}
+
+.bandersnatch-progress-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.bandersnatch-progress-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--fg-bright);
+  transition: width 0.15s linear;
+}
+
+.bandersnatch-timer-box.urgent {
+  border-color: var(--danger-color, #ff3333);
+}
+
+.bandersnatch-timer-box.urgent .bandersnatch-timer-digits {
+  color: var(--danger-color, #ff3333);
+  text-shadow: 0 0 6px red;
+  animation: pulse 0.35s infinite alternate;
+}
+
+.bandersnatch-timer-box.urgent .bandersnatch-progress-fill {
+  background: var(--danger-color, #ff3333);
+}
+
+.bandersnatch-choices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.bandersnatch-choice-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.3);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.bandersnatch-choice-item:hover:not(.locked) {
+  background: var(--accent-color, rgba(0, 255, 65, 0.15));
+  border-color: var(--fg-bright);
+}
+
+.bandersnatch-choice-item.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.bandersnatch-choice-key {
+  font-weight: bold;
+  color: var(--fg-bright);
+  font-size: 18px;
+}
+
+.bandersnatch-choice-label {
+  font-weight: bold;
+  color: var(--fg-bright);
+}
+
+.bandersnatch-choice-desc {
+  color: var(--fg-dim);
+  font-size: 17px;
+  margin-left: auto;
+}
+
 /* Available Actions Bar */
 .action-bar-container {
   display: flex;
