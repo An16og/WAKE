@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WAKE.EXE</title>
+  <link rel="stylesheet" href="./src/styles/theme.css" />
+</head>
+<body class="crt phosphor-green">
+  <div class="crt-overlay"></div>
+  <div class="scanlines"></div>
+
+  <div id="app" class="app-container">
+    <header class="system-header">
+      <div class="brand">WAKE.EXE [SYSTEM TERMINAL v0.1.0]</div>
+      <div class="system-controls">
+        <span id="theme-toggle" class="clickable">[COLOR: GREEN]</span>
+        <span id="safe-mode-toggle" class="clickable">[SAFE MODE: OFF]</span>
+        <span id="audio-toggle" class="clickable">[AUDIO: OFF]</span>
+      </div>
+    </header>
+
+    <div class="main-layout">
+      <main id="terminal-pane" class="terminal-pane" tabindex="0">
+        <div id="terminal-output" class="terminal-output"></div>
+        <div id="terminal-prompt-line" class="prompt-line">
+          <span class="prompt-symbol">&gt;&nbsp;</span>
+          <input type="text" id="terminal-input" autofocus autocomplete="off" spellcheck="false" />
+        </div>
+      </main>
+
+      <aside id="ghost-pane" class="ghost-pane">
+        <div class="pane-title">GHOST // PROCESS</div>
+        <div class="ghost-section">
+          <div class="status-row"><span class="label">PROVIDER:</span> <span id="ghost-provider" class="val">DETECTING...</span></div>
+          <div class="status-row"><span class="label">MODEL:</span> <span id="ghost-model" class="val">--</span></div>
+          <div class="status-row"><span class="label">STATUS:</span> <span id="ghost-status" class="val">OFFLINE</span></div>
+          <div class="status-row"><span class="label">LATENCY:</span> <span id="ghost-latency" class="val">0ms</span></div>
+        </div>
+
+        <div class="pane-title">LOOKAHEAD QUEUE</div>
+        <div id="queue-slots" class="queue-slots">
+          <div class="queue-slot empty">[SLOT 1] PENDING</div>
+          <div class="queue-slot empty">[SLOT 2] PENDING</div>
+          <div class="queue-slot empty">[SLOT 3] PENDING</div>
+        </div>
+
+        <div class="pane-title">PLAYER PROFILE</div>
+        <div id="profile-tags" class="profile-tags">
+          <span class="tag">CALIBRATING</span>
+        </div>
+
+        <div class="pane-title">NEURAL LEARNING FEED</div>
+        <div id="learning-feed" class="learning-feed">
+          <div class="feed-item">&gt; Listening on memory bus...</div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="system-footer">
+      <div id="distance-meter" class="distance-meter">
+        DISTANCE TO THING: [==========] 10/10
+      </div>
+      <div class="hint-bar">Press ~ for Debug Console | Type 'help' for commands</div>
+    </footer>
+  </div>
+
+  <div id="debug-modal" class="debug-modal hidden">
+    <div class="debug-header">
+      <span>GHOST // DEBUG CONSOLE</span>
+      <button id="close-debug-btn">[X]</button>
+    </div>
+    <pre id="debug-json">No raw telemetry captured yet.</pre>
+  </div>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

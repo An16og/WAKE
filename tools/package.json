@@ -1,0 +1,20 @@
+{
+  "name": "@wake/tools",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "eval": "tsx src/eval.ts",
+    "generate-sfx": "tsx src/generate-sfx.ts"
+  },
+  "dependencies": {
+    "@wake/content": "*",
+    "@wake/shared": "*",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
