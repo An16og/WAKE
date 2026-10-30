@@ -49,6 +49,13 @@ const audioToggleEl = document.getElementById('audio-toggle') as HTMLElement;
 const debugModalEl = document.getElementById('debug-modal') as HTMLElement;
 const closeDebugBtn = document.getElementById('close-debug-btn') as HTMLElement;
 const debugJsonEl = document.getElementById('debug-json') as HTMLElement;
+const jumpscareOverlayEl = document.getElementById('jumpscare-overlay') as HTMLElement;
+const jumpscareArtEl = document.getElementById('jumpscare-art') as HTMLElement;
+const jumpscareTextEl = document.getElementById('jumpscare-text') as HTMLElement;
+
+// Konami Code Tracker
+const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+let konamiPos = 0;
 
 // Session & State
 const sessionId = localStorage.getItem('wake_session_id') || `wake-${Math.random().toString(36).substring(2, 9)}`;
@@ -706,11 +713,56 @@ audioToggleEl.addEventListener('click', () => {
   audioToggleEl.textContent = isAudioMuted ? '[AUDIO: OFF]' : '[AUDIO: ON]';
 });
 
+function triggerKonamiJumpscare(): void {
+  const monsterAscii = `
+      \\ \\  / /      .------.      \\ \\  / /     
+       \\ \\/ /     /  (X)  (X) \\    \\ \\/ /      
+        \\  /     |   /=====\\   |    \\  /       
+        /  \\     |  |||||||||  |    /  \\       
+       / /\\ \\     \\  \\=====/  /    / /\\ \\      
+      / /  \\ \\     '--------'     / /  \\ \\     
+     / /    \\ \\   / / |  | \\ \\   / /    \\ \\    
+  `;
+
+  jumpscareArtEl.textContent = monsterAscii;
+
+  if (isSafeMode) {
+    jumpscareTextEl.textContent = '[SAFE MODE: THE GHOST OBSERVES YOUR CHEAT CODE IN SILENCE]';
+    soundEngine.playKeyClick();
+  } else {
+    jumpscareTextEl.textContent = 'YOU CALLED UPON WHAT SHOULD HAVE SLEPT';
+    soundEngine.playGlitchNoise();
+  }
+
+  jumpscareOverlayEl.classList.remove('hidden');
+  jumpscareOverlayEl.classList.add('active');
+
+  setTimeout(() => {
+    jumpscareOverlayEl.classList.remove('active');
+    jumpscareOverlayEl.classList.add('hidden');
+    printLine('\n[SYSTEM: KONAMI SEQUENCE DETECTED. GHOST PROFILE UPDATED.]', 'danger');
+    addLearningFeed('> Konami code breached memory limits.');
+  }, isSafeMode ? 2500 : 1800);
+}
+
+// Global Key Listeners
 window.addEventListener('keydown', (e) => {
   if (e.key === '`' || e.key === '~') {
     e.preventDefault();
     isDebugOpen = !isDebugOpen;
     debugModalEl.classList.toggle('hidden', !isDebugOpen);
+    return;
+  }
+
+  // Konami progress check
+  if (e.key.toLowerCase() === KONAMI_CODE[konamiPos].toLowerCase()) {
+    konamiPos++;
+    if (konamiPos === KONAMI_CODE.length) {
+      konamiPos = 0;
+      triggerKonamiJumpscare();
+    }
+  } else {
+    konamiPos = 0;
   }
 });
 

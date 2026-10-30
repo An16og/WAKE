@@ -299,6 +299,55 @@ body.monochrome {
   100% { opacity: 1; }
 }
 
+.jumpscare-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: black;
+  color: var(--danger-color);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+.jumpscare-overlay.hidden {
+  display: none;
+}
+
+.jumpscare-content {
+  text-align: center;
+  font-size: 22px;
+}
+
+#jumpscare-art {
+  font-family: inherit;
+  font-size: 20px;
+  line-height: 1.1;
+  color: var(--danger-color);
+  text-shadow: 0 0 10px red;
+}
+
+.jumpscare-text {
+  margin-top: 18px;
+  font-size: 24px;
+  letter-spacing: 0.15em;
+  font-weight: bold;
+}
+
+body:not(.safe-mode) .jumpscare-overlay.active {
+  animation: subtle-glitch 0.4s 2;
+}
+
+@keyframes subtle-glitch {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(-3px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;
