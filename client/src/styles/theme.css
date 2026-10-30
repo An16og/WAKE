@@ -573,44 +573,59 @@ body.monochrome {
   color: var(--fg-bright);
 }
 
-/* Jumpscare */
+/* Konami Easter Egg Jumpscare Overlay */
 .jumpscare-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: black;
-  color: var(--danger-color);
+  background: #000000;
+  color: var(--fg-bright);
   z-index: 10000;
   display: flex;
   justify-content: center;
   align-items: center;
   flex-direction: column;
+  cursor: pointer;
 }
 
 .jumpscare-overlay.hidden {
-  display: none;
+  display: none !important;
 }
 
 .jumpscare-content {
   text-align: center;
-  font-size: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-#jumpscare-art {
-  font-family: inherit;
-  font-size: 20px;
-  line-height: 1.1;
-  color: var(--danger-color);
-  text-shadow: 0 0 10px red;
+.konami-skull-canvas {
+  width: 220px;
+  height: 240px;
+  image-rendering: pixelated;
+  display: block;
 }
 
 .jumpscare-text {
   margin-top: 18px;
-  font-size: 24px;
-  letter-spacing: 0.15em;
+  font-family: var(--font-family);
+  font-size: 32px;
+  letter-spacing: 0.16em;
   font-weight: bold;
+  color: var(--fg-bright);
+  text-shadow: 0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000;
+}
+
+.jumpscare-sub {
+  margin-top: 8px;
+  font-family: var(--font-family);
+  font-size: 22px;
+  letter-spacing: 0.1em;
+  color: var(--fg-color);
+  max-width: 580px;
+  line-height: 1.3;
 }
 
 @keyframes pulse {

@@ -21,6 +21,12 @@ export class DoomViewRenderer {
     this.startLoop();
   }
 
+  private mirrorMorphStage: number = 0;
+
+  public setMirrorMorphStage(stage: number): void {
+    this.mirrorMorphStage = Math.max(0, Math.min(4, stage));
+  }
+
   public setMonochrome(mono: boolean): void {
     this.isMonochrome = mono;
   }
@@ -848,68 +854,235 @@ export class DoomViewRenderer {
 
   // ------------------------------------------
   // ROOM 7: MIRROR ROOM
-  // Subject: Gothic Cheval Mirror & Terrifying Demonic Beast Reflection
+  // Subject: Gothic Cheval Mirror & Terrifying Morphing/Enlarging Beast Reflection
   // ------------------------------------------
-  private renderMirrorRoom(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, frame: number): void {
-    // 1. Ornate Gothic Standing Cheval Mirror Frame
-    const mirW = 68;
-    const mirH = 96;
-    const mirX = cx - mirW / 2;
-    const mirY = cy - 36;
+  private renderMirrorRoom(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, _frame: number): void {
+    const stage = this.mirrorMorphStage;
 
-    // Arched decorative frame top
+    // STAGE 4: Full-Screen Screen-Filling Beast Surge (Glass Shattered!)
+    if (stage === 4) {
+      // Inverted radial motion burst lines
+      for (let a = 0; a < 16; a++) {
+        const ang = (a / 16) * Math.PI * 2;
+        this.drawLine(buf, w, h, cx, cy, cx + Math.cos(ang) * 160, cy + Math.sin(ang) * 100, 1, 1);
+      }
+
+      // Shattered glass shards flying outward
+      for (let s = 0; s < 10; s++) {
+        const sx = (s * 31) % w;
+        const sy = (s * 23) % h;
+        this.drawLine(buf, w, h, sx, sy, sx + 8, sy + 12, 1, 2);
+      }
+
+      // Colossal Horned Demon Beast Face Filling Screen
+      const bCX = cx;
+      const bCY = cy - 10;
+
+      // Massive curved demonic horns reaching screen edges
+      this.drawLine(buf, w, h, bCX - 30, bCY - 20, 20, 10, 1, 6);
+      this.drawLine(buf, w, h, 20, 10, 40, 2, 1, 4);
+      this.drawLine(buf, w, h, bCX + 30, bCY - 20, w - 20, 10, 1, 6);
+      this.drawLine(buf, w, h, w - 20, 10, w - 40, 2, 1, 4);
+
+      // Huge cranium silhouette with scanline stipple
+      this.drawSolidRect(buf, w, h, bCX - 65, bCY - 30, 130, 60, 1);
+      this.drawDitherRect(buf, w, h, bCX - 60, bCY - 26, 120, 24, 'diagHatch');
+
+      // Giant gaping maw filled with razor-sharp fangs
+      const mouthY = bCY + 36;
+      this.drawSolidRect(buf, w, h, bCX - 50, mouthY, 100, 48, 0);
+      this.drawOutlineRect(buf, w, h, bCX - 50, mouthY, 100, 48, 1, 3);
+
+      // Top razor fangs
+      for (let f = bCX - 42; f <= bCX + 42; f += 14) {
+        this.drawLine(buf, w, h, f, mouthY, f + 5, mouthY + 22, 1, 3);
+        this.drawLine(buf, w, h, f + 10, mouthY, f + 5, mouthY + 22, 1, 3);
+      }
+      // Bottom sharp teeth
+      for (let f = bCX - 36; f <= bCX + 36; f += 14) {
+        this.drawLine(buf, w, h, f, mouthY + 46, f + 4, mouthY + 28, 1, 3);
+        this.drawLine(buf, w, h, f + 8, mouthY + 46, f + 4, mouthY + 28, 1, 3);
+      }
+
+      // Piercing White Diamond Slit Eyes
+      const eyeW = 32;
+      const eyeH = 20;
+      // Left eye
+      this.drawSolidRect(buf, w, h, bCX - 48, bCY - 6, eyeW, eyeH, 0);
+      this.drawOutlineRect(buf, w, h, bCX - 48, bCY - 6, eyeW, eyeH, 1, 2);
+      this.drawSolidRect(buf, w, h, bCX - 34, bCY - 4, 6, eyeH - 4, 1);
+
+      // Right eye
+      this.drawSolidRect(buf, w, h, bCX + 16, bCY - 6, eyeW, eyeH, 0);
+      this.drawOutlineRect(buf, w, h, bCX + 16, bCY - 6, eyeW, eyeH, 1, 2);
+      this.drawSolidRect(buf, w, h, bCX + 28, bCY - 4, 6, eyeH - 4, 1);
+      return;
+    }
+
+    // STAGES 0 to 3: Progressive Zoom and Morphing inside the Mirror Frame
+    const stageScales = [1.0, 1.35, 1.8, 2.3];
+    const sScale = stageScales[stage] || 1.0;
+
+    const mirW = Math.floor(68 * sScale);
+    const mirH = Math.floor(96 * sScale);
+    const mirX = cx - Math.floor(mirW / 2);
+    const mirY = cy - Math.floor(mirH / 2) + Math.floor(10 * (1 - sScale / 2.3));
+
+    // Mirror Frame & Arched Top
     this.drawOutlineRect(buf, w, h, mirX, mirY + 12, mirW, mirH - 12, 1, 2);
     this.drawLine(buf, w, h, mirX, mirY + 12, cx, mirY, 1, 2);
     this.drawLine(buf, w, h, cx, mirY, mirX + mirW, mirY + 12, 1, 2);
 
-    // Carved Gargoyle Claw-Feet on Floor
-    this.drawLine(buf, w, h, mirX - 6, mirY + mirH + 8, mirX + 6, mirY + mirH, 1, 3);
-    this.drawLine(buf, w, h, mirX + mirW + 6, mirY + mirH + 8, mirX + mirW - 6, mirY + mirH, 1, 3);
+    // Carved Gargoyle Claw-Feet (visible at smaller zooms)
+    if (stage < 2) {
+      this.drawLine(buf, w, h, mirX - 6, mirY + mirH + 8, mirX + 6, mirY + mirH, 1, 3);
+      this.drawLine(buf, w, h, mirX + mirW + 6, mirY + mirH + 8, mirX + mirW - 6, mirY + mirH, 1, 3);
+    }
 
-    // Mirror Glass Surface (Deep void with subtle reflection dither)
+    // Mirror Glass Surface
     this.drawSolidRect(buf, w, h, mirX + 4, mirY + 8, mirW - 8, mirH - 12, 0);
     this.drawDitherRect(buf, w, h, mirX + 6, mirY + 10, mirW - 12, mirH - 16, 'stipple12');
 
-    // 2. Spiderweb Fracture cracking across the glass
-    this.drawLine(buf, w, h, mirX + 8, mirY + 16, cx - 4, cy - 4, 1, 1);
-    this.drawLine(buf, w, h, cx - 4, cy - 4, cx + 18, cy + 22, 1, 1);
-    this.drawLine(buf, w, h, cx - 4, cy - 4, mirX + 48, mirY + 8, 1, 1);
-
-    // 3. Demonic Beast Silhouette Reflection (The Twist: The Player IS The Thing)
-    const headCX = cx;
-    const headCY = cy - 4;
-
-    // Curved beast horns rising from skull
-    this.drawLine(buf, w, h, headCX - 8, headCY - 10, headCX - 22, headCY - 26, 1, 3);
-    this.drawLine(buf, w, h, headCX - 22, headCY - 26, headCX - 16, headCY - 30, 1, 2);
-    this.drawLine(buf, w, h, headCX + 8, headCY - 10, headCX + 22, headCY - 26, 1, 3);
-    this.drawLine(buf, w, h, headCX + 22, headCY - 26, headCX + 16, headCY - 30, 1, 2);
-
-    // Broad demonic head silhouette
-    this.drawSolidRect(buf, w, h, headCX - 14, headCY - 10, 28, 20, 1);
-
-    // Broad hunched shoulders
-    this.drawSolidRect(buf, w, h, headCX - 24, headCY + 10, 48, 28, 1);
-
-    // Piercing glowing slit white beast eyes
-    const eyeFlare = frame === 1 ? 5 : 3;
-    this.drawSolidRect(buf, w, h, headCX - 9, headCY - 4, eyeFlare, 2, 0);
-    this.drawSolidRect(buf, w, h, headCX + 5, headCY - 4, eyeFlare, 2, 0);
-
-    // Snarling razor-toothed grin
-    this.drawHLine(buf, w, h, headCX - 8, headCY + 4, 16, 0);
-    for (let tX = headCX - 6; tX <= headCX + 6; tX += 3) {
-      this.drawVLine(buf, w, h, tX, headCY + 3, 3, 1);
+    // Progressive Spiderweb Fractures across glass
+    if (stage >= 1) {
+      this.drawLine(buf, w, h, mirX + 8, mirY + 16, cx - 4, cy - 4, 1, 1);
+      this.drawLine(buf, w, h, cx - 4, cy - 4, mirX + mirW - 12, mirY + 24, 1, 1);
+    }
+    if (stage >= 2) {
+      this.drawLine(buf, w, h, cx - 4, cy - 4, cx + 18, cy + 28, 1, 1);
+      this.drawLine(buf, w, h, cx + 18, cy + 28, mirX + mirW - 8, mirY + mirH - 20, 1, 1);
+      this.drawLine(buf, w, h, cx - 4, cy - 4, mirX + 16, mirY + mirH - 16, 1, 1);
+    }
+    if (stage >= 3) {
+      this.drawLine(buf, w, h, cx, mirY + 10, cx - 8, cy - 20, 1, 2);
+      this.drawLine(buf, w, h, cx - 8, cy - 20, cx - 34, cy + 12, 1, 1);
+      this.drawLine(buf, w, h, cx + 12, cy - 16, cx + 42, cy + 8, 1, 1);
     }
 
-    // Clawed hands pressed flat against inside of glass
-    const handY = headCY + 22;
-    this.drawSolidRect(buf, w, h, mirX + 8, handY, 10, 8, 1);
-    this.drawSolidRect(buf, w, h, mirX + mirW - 18, handY, 10, 8, 1);
-    // Sharp claw tips
-    for (let f = 0; f < 3; f++) {
-      this.drawVLine(buf, w, h, mirX + 9 + f * 3, handY - 4, 4, 1);
-      this.drawVLine(buf, w, h, mirX + mirW - 17 + f * 3, handY - 4, 4, 1);
+    const headCX = cx;
+    const headCY = cy - Math.floor(4 * sScale);
+
+    // ==========================================
+    // STAGE 0: Ordinary Human Reflection
+    // ==========================================
+    if (stage === 0) {
+      // Human Head
+      this.drawSolidRect(buf, w, h, headCX - 11, headCY - 12, 22, 24, 1);
+      // Human Shoulders
+      this.drawSolidRect(buf, w, h, headCX - 22, headCY + 12, 44, 26, 1);
+      // Normal Human Eyes
+      this.drawSolidRect(buf, w, h, headCX - 6, headCY - 3, 3, 2, 0);
+      this.drawSolidRect(buf, w, h, headCX + 3, headCY - 3, 3, 2, 0);
+      // Nose bridge and closed mouth
+      this.drawVLine(buf, w, h, headCX, headCY - 1, 4, 0);
+      this.drawHLine(buf, w, h, headCX - 4, headCY + 6, 8, 0);
+      return;
+    }
+
+    // ==========================================
+    // STAGE 1: Corruption & Small Sprouting Horns (Zoom 1.35x)
+    // ==========================================
+    if (stage === 1) {
+      // Sprouting Horns (small, sharp)
+      this.drawLine(buf, w, h, headCX - 8, headCY - 12, headCX - 18, headCY - 24, 1, 2);
+      this.drawLine(buf, w, h, headCX + 8, headCY - 12, headCX + 18, headCY - 24, 1, 2);
+
+      // Widening Head
+      this.drawSolidRect(buf, w, h, headCX - 14, headCY - 12, 28, 26, 1);
+      this.drawSolidRect(buf, w, h, headCX - 26, headCY + 14, 52, 30, 1);
+
+      // Eyes turn piercing white dots
+      this.drawSolidRect(buf, w, h, headCX - 7, headCY - 3, 4, 3, 0);
+      this.drawSolidRect(buf, w, h, headCX + 3, headCY - 3, 4, 3, 0);
+      this.drawSolidRect(buf, w, h, headCX - 6, headCY - 2, 2, 2, 1);
+      this.drawSolidRect(buf, w, h, headCX + 4, headCY - 2, 2, 2, 1);
+
+      // Mouth snarling slightly
+      this.drawHLine(buf, w, h, headCX - 6, headCY + 6, 12, 0);
+      return;
+    }
+
+    // ==========================================
+    // STAGE 2: Jaw Splits, Fangs & Clawed Hands (Zoom 1.8x)
+    // ==========================================
+    if (stage === 2) {
+      // Long curved beast horns
+      this.drawLine(buf, w, h, headCX - 12, headCY - 14, headCX - 28, headCY - 34, 1, 3);
+      this.drawLine(buf, w, h, headCX - 28, headCY - 34, headCX - 20, headCY - 40, 1, 2);
+      this.drawLine(buf, w, h, headCX + 12, headCY - 14, headCX + 28, headCY - 34, 1, 3);
+      this.drawLine(buf, w, h, headCX + 28, headCY - 34, headCX + 20, headCY - 40, 1, 2);
+
+      // Broad demonic head & shoulders
+      this.drawSolidRect(buf, w, h, headCX - 20, headCY - 14, 40, 34, 1);
+      this.drawSolidRect(buf, w, h, headCX - 36, headCY + 20, 72, 36, 1);
+
+      // Slit Predatory Glowing Eyes
+      this.drawSolidRect(buf, w, h, headCX - 14, headCY - 5, 8, 4, 0);
+      this.drawSolidRect(buf, w, h, headCX + 6, headCY - 5, 8, 4, 0);
+      this.drawVLine(buf, w, h, headCX - 10, headCY - 5, 4, 1);
+      this.drawVLine(buf, w, h, headCX + 10, headCY - 5, 4, 1);
+
+      // Open Jaw with Fangs
+      this.drawSolidRect(buf, w, h, headCX - 12, headCY + 8, 24, 10, 0);
+      for (let t = headCX - 10; t <= headCX + 10; t += 5) {
+        this.drawVLine(buf, w, h, t, headCY + 8, 4, 1);
+        this.drawVLine(buf, w, h, t + 2, headCY + 14, 4, 1);
+      }
+
+      // Clawed hands pressing against glass
+      const hY = headCY + 28;
+      this.drawSolidRect(buf, w, h, mirX + 8, hY, 14, 10, 1);
+      this.drawSolidRect(buf, w, h, mirX + mirW - 22, hY, 14, 10, 1);
+      for (let f = 0; f < 3; f++) {
+        this.drawVLine(buf, w, h, mirX + 10 + f * 4, hY - 6, 6, 1);
+        this.drawVLine(buf, w, h, mirX + mirW - 20 + f * 4, hY - 6, 6, 1);
+      }
+      return;
+    }
+
+    // ==========================================
+    // STAGE 3: Full Monster Face Enlarged Filling Mirror (Zoom 2.3x)
+    // ==========================================
+    if (stage === 3) {
+      // Massive Horns reaching frame corners
+      this.drawLine(buf, w, h, headCX - 16, headCY - 16, headCX - 40, headCY - 44, 1, 4);
+      this.drawLine(buf, w, h, headCX - 40, headCY - 44, headCX - 28, headCY - 52, 1, 3);
+      this.drawLine(buf, w, h, headCX + 16, headCY - 16, headCX + 40, headCY - 44, 1, 4);
+      this.drawLine(buf, w, h, headCX + 40, headCY - 44, headCX + 28, headCY - 52, 1, 3);
+
+      // Giant Demonic Skull Face filling mirror
+      this.drawSolidRect(buf, w, h, headCX - 32, headCY - 18, 64, 48, 1);
+      this.drawDitherRect(buf, w, h, headCX - 28, headCY - 14, 56, 14, 'diagHatch');
+
+      // Piercing Star-Slit Diamond Eyes
+      this.drawSolidRect(buf, w, h, headCX - 22, headCY - 6, 14, 10, 0);
+      this.drawSolidRect(buf, w, h, headCX + 8, headCY - 6, 14, 10, 0);
+      this.drawLine(buf, w, h, headCX - 15, headCY - 8, headCX - 15, headCY + 5, 1, 2);
+      this.drawLine(buf, w, h, headCX + 15, headCY - 8, headCX + 15, headCY + 5, 1, 2);
+
+      // Wide Snarling Fanged Maw
+      const jawY = headCY + 14;
+      this.drawSolidRect(buf, w, h, headCX - 22, jawY, 44, 20, 0);
+      this.drawOutlineRect(buf, w, h, headCX - 22, jawY, 44, 20, 1, 2);
+
+      // Upper fangs
+      for (let t = headCX - 18; t <= headCX + 18; t += 7) {
+        this.drawLine(buf, w, h, t, jawY, t + 2, jawY + 9, 1, 2);
+      }
+      // Lower fangs
+      for (let t = headCX - 15; t <= headCX + 15; t += 7) {
+        this.drawLine(buf, w, h, t, jawY + 20, t + 2, jawY + 11, 1, 2);
+      }
+
+      // Claws scratching fiercely against glass
+      const cY = headCY + 40;
+      this.drawSolidRect(buf, w, h, mirX + 8, cY, 18, 14, 1);
+      this.drawSolidRect(buf, w, h, mirX + mirW - 26, cY, 18, 14, 1);
+      for (let f = 0; f < 4; f++) {
+        this.drawLine(buf, w, h, mirX + 10 + f * 4, cY, mirX + 6 + f * 4, cY - 10, 1, 2);
+        this.drawLine(buf, w, h, mirX + mirW - 24 + f * 4, cY, mirX + mirW - 28 + f * 4, cY - 10, 1, 2);
+      }
+      return;
     }
   }
 }

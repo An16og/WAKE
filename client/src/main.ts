@@ -9,7 +9,6 @@ import {
   STORY_ROOMS,
   TITLE_ART,
   DEATH_ART,
-  MIRROR_MORPH_FRAMES,
   FALLBACK_CHALLENGES
 } from '@wake/content';
 import {
@@ -60,8 +59,9 @@ const debugModalEl = document.getElementById('debug-modal') as HTMLElement;
 const closeDebugBtn = document.getElementById('close-debug-btn') as HTMLElement;
 const debugJsonEl = document.getElementById('debug-json') as HTMLElement;
 const jumpscareOverlayEl = document.getElementById('jumpscare-overlay') as HTMLElement;
-const jumpscareArtEl = document.getElementById('jumpscare-art') as HTMLElement;
+const konamiSkullCanvas = document.getElementById('konami-skull-canvas') as HTMLCanvasElement;
 const jumpscareTextEl = document.getElementById('jumpscare-text') as HTMLElement;
+const jumpscareSubEl = document.getElementById('jumpscare-sub') as HTMLElement;
 
 // 2.5D Doom-style Opaque Raycast Canvas Visualizer
 const doomRenderer = new DoomViewRenderer(roomCanvasEl);
@@ -489,23 +489,34 @@ async function triggerMirrorFinale(): Promise<void> {
   printNarrative('YOU APPROACH THE MIRROR VAULT GLASS...', 'bright');
   printNarrative('========================================================\n');
 
-  if (subtitleEl) subtitleEl.textContent = 'You approach the mirror vault glass...';
-
-  for (let i = 0; i < MIRROR_MORPH_FRAMES.length; i++) {
-    await new Promise((r) => setTimeout(r, 700));
-    soundEngine.playGlitchNoise();
-    if (subtitleEl) {
-      subtitleEl.textContent = `The glass ripples... reflection shifting [${i + 1}/5]`;
-    }
-  }
-
-  await new Promise((r) => setTimeout(r, 900));
-  if (subtitleEl) {
-    subtitleEl.textContent = 'I looked into the glass. The footsteps behind me... were my own.';
-  }
-
+  // Stage 0: Calm human reflection in mirror
+  doomRenderer.setMirrorMorphStage(0);
+  if (subtitleEl) subtitleEl.textContent = 'You look into the antique glass. Your reflection stares back in silence.';
+  soundEngine.playKeyClick();
   await new Promise((r) => setTimeout(r, 1400));
+
+  // Stage 1: Corruption starts, horns sprout, zoom 1.35x
+  doomRenderer.setMirrorMorphStage(1);
   soundEngine.playGlitchNoise();
+  if (subtitleEl) subtitleEl.textContent = 'The reflection twitches... horns begin rising from your skull.';
+  await new Promise((r) => setTimeout(r, 1400));
+
+  // Stage 2: Fangs & Glass fractures, zoom 1.8x
+  doomRenderer.setMirrorMorphStage(2);
+  soundEngine.playGlitchNoise();
+  if (subtitleEl) subtitleEl.textContent = 'The glass cracks. The jaw splits open into snarling predator fangs.';
+  await new Promise((r) => setTimeout(r, 1400));
+
+  // Stage 3: Monster face fills mirror frame, zoom 2.3x
+  doomRenderer.setMirrorMorphStage(3);
+  soundEngine.playGlitchNoise();
+  if (subtitleEl) subtitleEl.textContent = 'The footsteps behind me were my own paws. I was never running from the thing.';
+  await new Promise((r) => setTimeout(r, 1600));
+
+  // Stage 4: Glass shatters! Beast face enlarges to fill entire screen!
+  doomRenderer.setMirrorMorphStage(4);
+  soundEngine.playGlitchNoise();
+  await new Promise((r) => setTimeout(r, 800));
 
   // DISPLAY "IT WAS YOU ALL ALONG" DIRECTLY IN THE IMAGE AREA!
   if (subtitleEl) subtitleEl.textContent = '';
@@ -516,7 +527,7 @@ async function triggerMirrorFinale(): Promise<void> {
   printNarrative('I WAS NEVER RUNNING FROM THE MONSTER.', 'bright');
   printNarrative('I AM THE MONSTER.', 'danger');
 
-  await new Promise((r) => setTimeout(r, 3600));
+  await new Promise((r) => setTimeout(r, 4000));
   displayEndingFile();
 }
 
@@ -696,7 +707,9 @@ function handleCommand(raw: string): void {
       break;
 
     case 'action':
-      if (parsed.verb === 'approach' && parsed.arg === 'mirror' && currentRoomId === 'mirror_room') {
+      if (parsed.verb === 'konami') {
+        triggerKonamiJumpscare();
+      } else if (parsed.verb === 'approach' && parsed.arg === 'mirror' && currentRoomId === 'mirror_room') {
         triggerMirrorFinale();
       } else {
         printNarrative(`Unknown action: "${raw}". Type "help" or click an available action above.`);
@@ -704,41 +717,135 @@ function handleCommand(raw: string): void {
       break;
 
     default:
+      if (raw.toLowerCase() === 'konami') {
+        triggerKonamiJumpscare();
+        break;
+      }
       printNarrative(`Unknown command: "${raw}". Type "help" for options.`);
+  }
+}
+
+// 1-Bit Scanline Skull Renderer matching Reference Image
+function drawKonamiSkull(canvas: HTMLCanvasElement, isMono: boolean): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, w, h);
+
+  const fgColor = isMono ? '#ffffff' : '#33ff33';
+  const dimColor = isMono ? '#888888' : '#1a771a';
+
+  // 36x42 Matrix mapping the exact reference 1-bit scanline skull
+  const skullRows = [
+    "             XXXXXXXXXXXX             ",
+    "           XXXXXXXXXXXXXXXX           ",
+    "         XXXXXXXXXXXXXXXXXXXX         ",
+    "        XXXXXXXXXXXXXXXXXXXXXX        ",
+    "       XXXXXXXXXXXXXXXXXXXXXXXX       ",
+    "      XXXXXXXXXXXXXXXXXXXXXXXXXX      ",
+    "     XXXXXXXXXXXXXXXXXXXXXXXXXXXX     ",
+    "    XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX    ",
+    "    XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX    ",
+    "   XXXXX      XXXXXXXXXX      XXXXX   ",
+    "   XXXX        XXXXXXXX        XXXX   ",
+    "  XXXX          XXXXXX          XXXX  ",
+    "  XXXX     +    XXXXXX     +    XXXX  ",
+    "  XXXX    +++   XXXXXX    +++   XXXX  ",
+    "  XXXX     +    XXXXXX     +    XXXX  ",
+    "  XXXX          XXXXXX          XXXX  ",
+    "   XXXX        XXX  XXX        XXXX   ",
+    "   XXXXX      XXXX  XXXX      XXXXX   ",
+    "   XXXXXXXXXXXXXX    XXXXXXXXXXXXXX   ",
+    "    XXXXXXXXXXXXX    XXXXXXXXXXXXX    ",
+    "    XXXXXXXXXXXX      XXXXXXXXXXXX    ",
+    "  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  ",
+    "  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  ",
+    "  XX X X X XXXXXXXXXXXXXXXX X X X XX  ",
+    "  XX X X X XXXXXXXXXXXXXXXX X X X XX  ",
+    "   X X X X                  X X X X   ",
+    "         XXXXXXXXXXXXXXXXXXXX         ",
+    "         XXXX              XXXX       ",
+    "         XXXX  T  T  T  T  XXXX       ",
+    "         XXXX  T  T  T  T  XXXX       ",
+    "         XXXX  T  T  T  T  XXXX       ",
+    "         XXXX  T  T  T  T  XXXX       ",
+    "         XXXXXXXXXXXXXXXXXXXX         ",
+    "          XXXXXXXXXXXXXXXXXX          ",
+    "          XXXX   XXXXXX   XXXX        ",
+    "           XXX   XXXXXX   XXX         ",
+    "           XXX    XXXX    XXX         ",
+    "            XX     XX     XX          ",
+    "                   XX                 ",
+    "                   XX                 ",
+    "                    X                 "
+  ];
+
+  const scale = 5;
+  const offX = Math.floor((w - 38 * scale) / 2);
+  const offY = Math.floor((h - skullRows.length * scale) / 2);
+
+  for (let r = 0; r < skullRows.length; r++) {
+    const row = skullRows[r];
+    for (let c = 0; c < row.length; c++) {
+      const ch = row[c];
+      const px = offX + c * scale;
+      const py = offY + r * scale;
+
+      if (ch === 'X') {
+        // Authentic horizontal scanline / stipple
+        ctx.fillStyle = (r % 2 === 0) ? fgColor : dimColor;
+        ctx.fillRect(px, py, scale, scale);
+      } else if (ch === '+') {
+        // Pure stark star-cross glint
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(px, py, scale, scale);
+      } else if (ch === 'T') {
+        // Vertical sharp white fangs
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(px, py, scale, scale);
+      }
+    }
   }
 }
 
 // Konami Jumpscare
 function triggerKonamiJumpscare(): void {
-  const monsterAscii = `
-      \\ \\  / /      .------.      \\ \\  / /     
-       \\ \\/ /     /  (X)  (X) \\    \\ \\/ /      
-        \\  /     |   /=====\\   |    \\  /       
-        /  \\     |  |||||||||  |    /  \\       
-       / /\\ \\     \\  \\=====/  /    / /\\ \\      
-      / /  \\ \\     '--------'     / /  \\ \\     
-     / /    \\ \\   / / |  | \\ \\   / /    \\ \\    
-  `;
-
-  jumpscareArtEl.textContent = monsterAscii;
+  if (konamiSkullCanvas) {
+    drawKonamiSkull(konamiSkullCanvas, isMonochrome);
+  }
 
   if (isSafeMode) {
-    jumpscareTextEl.textContent = '[SAFE MODE: THE GHOST OBSERVES YOUR CHEAT CODE IN SILENCE]';
+    jumpscareTextEl.textContent = '[SAFE MODE: THE GHOST OBSERVES IN SILENCE]';
+    if (jumpscareSubEl) {
+      jumpscareSubEl.textContent = 'Cheat sequence registered. Secret memory unlocked.';
+    }
     soundEngine.playKeyClick();
   } else {
     jumpscareTextEl.textContent = 'YOU CALLED UPON WHAT SHOULD HAVE SLEPT';
+    if (jumpscareSubEl) {
+      jumpscareSubEl.textContent = 'WHAT WATCHES YOU FROM THE MACHINE HAS YOUR FACE, YOUR TEETH, YOUR SINS.';
+    }
     soundEngine.playGlitchNoise();
   }
 
   jumpscareOverlayEl.classList.remove('hidden');
-  jumpscareOverlayEl.classList.add('active');
 
-  setTimeout(() => {
-    jumpscareOverlayEl.classList.remove('active');
+  const dismiss = () => {
     jumpscareOverlayEl.classList.add('hidden');
-    printNarrative('\n[SYSTEM: KONAMI SEQUENCE DETECTED. GHOST PROFILE UPDATED.]', 'danger');
-    addLearningFeed('> Konami code breached memory limits.');
-  }, isSafeMode ? 2500 : 1800);
+    window.removeEventListener('keydown', dismiss);
+    jumpscareOverlayEl.removeEventListener('click', dismiss);
+  };
+
+  jumpscareOverlayEl.addEventListener('click', dismiss, { once: true });
+  window.addEventListener('keydown', dismiss, { once: true });
+
+  setTimeout(dismiss, isSafeMode ? 3500 : 4500);
+
+  printNarrative('\n[SYSTEM: KONAMI SEQUENCE DETECTED. GHOST PROFILE UPDATED.]', 'danger');
+  addLearningFeed('> Konami code breached memory limits.');
 }
 
 // Telemetry & State Persistence
