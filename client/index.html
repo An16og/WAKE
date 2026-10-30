@@ -44,15 +44,24 @@
       <div class="bandersnatch-screen-frame">
         <canvas id="room-canvas-3d" class="bandersnatch-canvas"></canvas>
 
-        <!-- Dynamic Subtitle (Netflix Bandersnatch Style) -->
-        <div id="scene-subtitle" class="bandersnatch-subtitle">
-          You wake drenched in cold sweat. Claws scrape behind the drywall.
-        </div>
-
         <!-- In-Image Reveal Overlay for Mirror Finale -->
         <div id="image-overlay-reveal" class="image-overlay-reveal hidden">
           <div class="reveal-line-main">IT WAS YOU ALL ALONG.</div>
           <div class="reveal-line-sub">I WAS NEVER RUNNING FROM THE MONSTER. I AM THE THING.</div>
+        </div>
+      </div>
+
+      <!-- Classic RPG Narrative Text Box (Bottom of Canvas Art) -->
+      <div class="rpg-dialogue-frame">
+        <div class="rpg-dialogue-header">
+          <span class="rpg-speaker-label">&gt;&gt; NARRATIVE</span>
+          <span id="rpg-act-badge" class="rpg-act-badge">[SCENE // LOG]</span>
+        </div>
+        <div class="rpg-dialogue-body">
+          <div id="scene-subtitle" class="rpg-dialogue-text">
+            You wake drenched in cold sweat. Claws scrape behind the drywall.
+          </div>
+          <div class="rpg-dialogue-cursor">▼</div>
         </div>
       </div>
 

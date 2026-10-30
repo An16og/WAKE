@@ -41,8 +41,12 @@ async function generateSfx() {
   for (const [name, prompt] of Object.entries(SFX_PROMPTS)) {
     const destPath = path.join(OUTPUT_DIR, `${name}.mp3`);
     if (fs.existsSync(destPath)) {
-      console.log(`[SFX Generator] File ${name}.mp3 already exists, skipping.`);
-      continue;
+      const stat = fs.statSync(destPath);
+      // If file exists and is larger than a placeholder dummy (>1KB), skip
+      if (stat.size > 1000) {
+        console.log(`[SFX Generator] File ${name}.mp3 already exists, skipping.`);
+        continue;
+      }
     }
 
     console.log(`[SFX Generator] Generating "${name}" with prompt: "${prompt}"...`);
