@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { checkProviderHealth, getProviderConfig } from './provider.js';
 import { initDatabase, saveRun, getRun, recordEvent } from './db.js';
+import { invokeDirector } from './director.js';
 
 // Load environment variables
 dotenv.config();
@@ -37,6 +38,16 @@ app.get('/health', async (_request, reply) => {
 app.get('/api/health', async (_request, reply) => {
   const health = await checkProviderHealth();
   return reply.send(health);
+});
+
+// Director endpoint for lookahead batch generation
+app.post('/api/director', async (request, reply) => {
+  const body = request.body as any;
+  if (!body || !body.profile) {
+    return reply.status(400).send({ error: 'profile required' });
+  }
+  const result = await invokeDirector(body.profile, body.currentRoom || 'bedroom', body.runState);
+  return reply.send(result);
 });
 
 // Run state persistence endpoints

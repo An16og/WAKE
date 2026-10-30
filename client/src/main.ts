@@ -1,7 +1,9 @@
-// WAKE.EXE - Master Game Engine & Terminal Client
+// WAKE.EXE - Master Game Engine & Director-Driven Terminal Client
 import {
   parseCommand,
-  getAutocompleteSuggestions
+  getAutocompleteSuggestions,
+  ChallengeItem,
+  PlayerProfile
 } from '@wake/shared';
 import {
   STORY_ROOMS,
@@ -48,7 +50,7 @@ const debugModalEl = document.getElementById('debug-modal') as HTMLElement;
 const closeDebugBtn = document.getElementById('close-debug-btn') as HTMLElement;
 const debugJsonEl = document.getElementById('debug-json') as HTMLElement;
 
-// Session & Telemetry State
+// Session & State
 const sessionId = localStorage.getItem('wake_session_id') || `wake-${Math.random().toString(36).substring(2, 9)}`;
 localStorage.setItem('wake_session_id', sessionId);
 
@@ -59,13 +61,22 @@ const inventory = new Set<string>();
 const solvedRooms = new Set<string>();
 const visitedRooms = new Set<string>();
 
-// Telemetry trackers
+// Telemetry & Profiler State
 let deaths = 0;
 let mistakes = 0;
 let roomsRevisited = 0;
 const startTime = Date.now();
+let lastCommandTimestamp = Date.now();
+const idleTimeSamples: number[] = [];
+let keystrokeCount = 0;
+let typingSpeedWpm = 50;
+let lastDirectorData: any = null;
 let activeMinigame: any = null;
 let isEndingPlayed = false;
+
+// Lookahead Queue State
+let lookaheadQueue: ChallengeItem[] = [];
+let isQueueGenerating = false;
 
 // UI State
 let isMonochrome = false;
@@ -73,7 +84,7 @@ let isSafeMode = false;
 let isAudioMuted = true;
 let isDebugOpen = false;
 
-// Helper: Output formatting
+// Output formatting
 function printLine(text: string, className = ''): void {
   const line = document.createElement('div');
   line.className = className;
@@ -99,7 +110,7 @@ async function typeWriter(text: string, speed = 12): Promise<void> {
   }
 }
 
-// Distance Meter & Health
+// Distance Meter
 function updateDistance(newDist: number): void {
   distance = Math.max(0, Math.min(10, newDist));
   soundEngine.setDistance(distance);
@@ -118,7 +129,8 @@ function recordMistake(penalty: number, mistakeName: string): void {
   updateDistance(distance - penalty);
   postTelemetry('mistake', { mistakeName, penalty, distanceRemaining: distance });
   addLearningFeed(`> Mistake noted: ${mistakeName} (Distance -${penalty})`);
-  recalculateTags();
+  recalculateProfileAndTags();
+  triggerDirectorLookahead();
 }
 
 function addLearningFeed(msg: string): void {
@@ -131,20 +143,115 @@ function addLearningFeed(msg: string): void {
   }
 }
 
-function recalculateTags(): void {
+function buildPlayerProfile(): PlayerProfile {
+  const totalPlayTimeMs = Date.now() - startTime;
+  const avgIdle = idleTimeSamples.length > 0
+    ? idleTimeSamples.reduce((a, b) => a + b, 0) / idleTimeSamples.length
+    : 2000;
+
   const tags: string[] = [];
-  if (mistakes === 0 && distance >= 9) tags.push('METHODICAL');
-  if (mistakes >= 3) tags.push('HESITANT');
+  if (typingSpeedWpm > 70) tags.push('FAST TYPIST');
+  else if (typingSpeedWpm < 30) tags.push('SLOW TYPIST');
+
+  if (avgIdle > 4000 && mistakes <= 1) tags.push('CAUTIOUS');
+  else if (avgIdle < 1500 && mistakes >= 2) tags.push('RECKLESS');
+  else if (mistakes === 0 && totalPlayTimeMs > 8000) tags.push('METHODICAL');
+
+  if (avgIdle > 5000) tags.push('HESITANT');
   if (deaths > 0) tags.push('MARKED');
-  if (visitedRooms.size > 4) tags.push('INQUISITIVE');
+  if (roomsRevisited >= 2) tags.push('INQUISITIVE');
   if (tags.length === 0) tags.push('CALIBRATING');
 
+  return {
+    sessionId,
+    totalPlayTimeMs: Math.round(totalPlayTimeMs),
+    typingSpeedWpm: Math.round(typingSpeedWpm),
+    commandIdleTimeAvgMs: Math.round(avgIdle),
+    deaths,
+    mistakesTotal: mistakes,
+    hintsUsedTotal: 0,
+    roomsRevisitedCount: roomsRevisited,
+    itemsIgnoredCount: 0,
+    solveTimesByTemplate: {},
+    tags,
+    recentMistake: mistakes > 0 ? `mistake #${mistakes}` : undefined
+  };
+}
+
+function recalculateProfileAndTags(): void {
+  const profile = buildPlayerProfile();
   profileTagsEl.innerHTML = '';
-  for (const t of tags) {
+  for (const t of profile.tags) {
     const span = document.createElement('span');
     span.className = 'tag';
     span.textContent = t;
     profileTagsEl.appendChild(span);
+  }
+}
+
+// Lookahead Queue UI Updater
+function renderQueueSlots(): void {
+  queueSlotsEl.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const slotDiv = document.createElement('div');
+    if (i < lookaheadQueue.length) {
+      const ch = lookaheadQueue[i];
+      slotDiv.className = 'queue-slot validated';
+      slotDiv.textContent = `[SLOT ${i + 1}] ${ch.template.toUpperCase()} (LVL ${ch.difficulty}) [READY]`;
+    } else if (isQueueGenerating) {
+      slotDiv.className = 'queue-slot generating';
+      slotDiv.textContent = `[SLOT ${i + 1}] NEURAL SYNAPSE COMPUTING...`;
+    } else {
+      slotDiv.className = 'queue-slot empty';
+      slotDiv.textContent = `[SLOT ${i + 1}] PREPARING NEXT WAVE`;
+    }
+    queueSlotsEl.appendChild(slotDiv);
+  }
+}
+
+// Background Director Invocation
+async function triggerDirectorLookahead(): Promise<void> {
+  if (isQueueGenerating) return;
+  isQueueGenerating = true;
+  renderQueueSlots();
+
+  const profile = buildPlayerProfile();
+  const startReq = performance.now();
+
+  try {
+    const res = await fetch('/api/director', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profile,
+        currentRoom: currentRoomId,
+        runState: { distance, inventory: Array.from(inventory) }
+      })
+    });
+
+    const latency = Math.round(performance.now() - startReq);
+    ghostLatencyEl.textContent = `${latency}ms`;
+
+    if (res.ok) {
+      const data = await res.json();
+      lastDirectorData = data;
+      debugJsonEl.textContent = JSON.stringify({ profile, director: data }, null, 2);
+
+      if (data.validatedChallenges && data.validatedChallenges.length > 0) {
+        lookaheadQueue = data.validatedChallenges;
+        addLearningFeed(`> Director adapted 3 challenges (Latency: ${latency}ms)`);
+      }
+
+      if (data.response?.taunts && data.response.taunts.length > 0) {
+        const taunt = data.response.taunts[Math.floor(Math.random() * data.response.taunts.length)];
+        addLearningFeed(`> Taunt prepared: "${taunt}"`);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Director Client] Request failed, using fallback:', err.message);
+  } finally {
+    isQueueGenerating = false;
+    renderQueueSlots();
   }
 }
 
@@ -168,16 +275,16 @@ function enterRoom(roomId: string): void {
   printLine(`  LOCATION: [${room.name}]`, 'bright');
   printLine('========================================================\n');
 
-  // Render Room ASCII Art
   if (ROOM_ART[roomId]) {
     printArt(ROOM_ART[roomId]);
     printLine('');
   }
 
-  // Narration blending: As we reach basement & corridor, blend first-person drift
-  const driftIndex = ['bedroom', 'hallway', 'kitchen', 'stairwell', 'basement', 'corridor', 'mirror_room'].indexOf(roomId);
-  if (driftIndex >= 4) {
-    // Heavy first person drift
+  // Narration blending
+  const roomSequence = ['bedroom', 'hallway', 'kitchen', 'pantry', 'stairwell', 'basement', 'corridor', 'mirror_room'];
+  const driftIndex = roomSequence.indexOf(roomId);
+
+  if (driftIndex >= 5) {
     for (const line of room.firstPersonDrift) {
       printLine(line);
     }
@@ -187,23 +294,29 @@ function enterRoom(roomId: string): void {
     }
   }
 
-  // Check if room has an unsolved challenge
+  // If director had a taunt ready and distance is getting close, whisper it
+  if (lastDirectorData?.response?.taunts?.length && distance <= 6 && Math.random() > 0.4) {
+    const taunt = lastDirectorData.response.taunts[0];
+    printLine(`\nWhisper behind your ear: "${taunt}"`, 'danger');
+  }
+
   if (room.challengeTemplate && !solvedRooms.has(roomId)) {
     startRoomChallenge(room.challengeTemplate, room.defaultChallengeId);
   } else {
-    // Print visible exits
     printRoomExits(room);
   }
 
   syncState();
-  recalculateTags();
+  recalculateProfileAndTags();
+  // Trigger director background generation for upcoming rooms!
+  triggerDirectorLookahead();
 }
 
 function printRoomExits(room: any): void {
   printLine('\nOBVIOUS EXITS:');
   for (const exit of room.exits) {
     const targetRoom = STORY_ROOMS[exit.targetRoomId];
-    const status = exit.locked ? '[LOCKED]' : '[OPEN]';
+    const status = exit.locked && !solvedRooms.has(room.id) ? '[LOCKED]' : '[OPEN]';
     printLine(`  - ${exit.direction.toUpperCase()} -> ${targetRoom?.name || exit.targetRoomId} ${status}`);
   }
   if (room.items && room.items.length > 0) {
@@ -211,16 +324,34 @@ function printRoomExits(room: any): void {
   }
 }
 
-// Minigame Launcher
+// Challenge Launcher (Uses Lookahead Queue when available!)
 function startRoomChallenge(template: string, defaultChallengeId?: string): void {
-  const challenge = FALLBACK_CHALLENGES.find((c) => c.id === defaultChallengeId) ||
-    FALLBACK_CHALLENGES.find((c) => c.template === template) ||
-    FALLBACK_CHALLENGES[0];
+  let challengeToRun: ChallengeItem | null = null;
+
+  // Check if lookahead queue has a matching or adapted challenge ready
+  if (lookaheadQueue.length > 0) {
+    const matchIdx = lookaheadQueue.findIndex((c) => c.template === template);
+    if (matchIdx >= 0) {
+      challengeToRun = lookaheadQueue.splice(matchIdx, 1)[0];
+      addLearningFeed(`> Lookahead HIT: Delivered ${template} (adapted)`);
+    } else {
+      challengeToRun = lookaheadQueue.shift() || null;
+    }
+    renderQueueSlots();
+  }
+
+  // Fallback to static pool if lookahead queue was empty
+  if (!challengeToRun) {
+    challengeToRun = FALLBACK_CHALLENGES.find((c) => c.id === defaultChallengeId) ||
+      FALLBACK_CHALLENGES.find((c) => c.template === template) ||
+      FALLBACK_CHALLENGES[0];
+    addLearningFeed(`> Lookahead fallback: Delivered static ${template}`);
+  }
 
   const state: MinigameState = {
-    template,
+    template: challengeToRun.template,
     active: true,
-    params: challenge.params,
+    params: challengeToRun.params,
     print: (txt: string, cls?: string) => printLine(txt, cls),
     onSuccess: () => {
       solvedRooms.add(currentRoomId);
@@ -228,13 +359,14 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
       printLine('\nPath unsealed. You can move forward now.', 'bright');
       printRoomExits(STORY_ROOMS[currentRoomId]);
       syncState();
+      triggerDirectorLookahead();
     },
     onMistake: (penalty: number, mistakeName: string) => {
       recordMistake(penalty, mistakeName);
     }
   };
 
-  switch (template) {
+  switch (challengeToRun.template) {
     case 'wordle':
       activeMinigame = new WordleRunner(state);
       break;
@@ -258,7 +390,7 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
   activeMinigame.start();
 }
 
-// ASCII Map
+// Map
 function printAsciiMap(): void {
   printLine('\n=================== ARCHITECTURAL MAP ===================', 'bright');
   const getMarker = (id: string) => (currentRoomId === id ? '@' : ' ');
@@ -274,7 +406,7 @@ function printAsciiMap(): void {
   printLine('=========================================================\n');
 }
 
-// Death & Respawn
+// Death
 function triggerDeath(): void {
   deaths++;
   soundEngine.playGlitchNoise();
@@ -282,7 +414,7 @@ function triggerDeath(): void {
   printLine('\nTHE THING CAUGHT YOU IN THE DARK.', 'danger');
   printLine(`Respawning at checkpoint: [${STORY_ROOMS[checkpointRoomId].name}]...\n`);
 
-  addLearningFeed(`> Death event #${deaths} recorded. Ghost laughs.`);
+  addLearningFeed(`> Death event #${deaths} registered.`);
   postTelemetry('death', { room: currentRoomId, deathsTotal: deaths });
 
   setTimeout(() => {
@@ -292,7 +424,7 @@ function triggerDeath(): void {
   }, 1200);
 }
 
-// Mirror Ending Morph Sequence
+// Mirror Ending
 async function triggerMirrorFinale(): Promise<void> {
   if (isEndingPlayed) return;
   isEndingPlayed = true;
@@ -321,30 +453,40 @@ async function triggerMirrorFinale(): Promise<void> {
 }
 
 function displayEndingFile(): void {
-  const playTimeSec = Math.round((Date.now() - startTime) / 1000);
+  const profile = buildPlayerProfile();
   printLine('\n\n========================================================', 'bright');
   printLine('       THE FILE IT KEPT ON YOU [FINAL DOSSIER]          ', 'bright');
   printLine('========================================================');
   printLine(`  SESSION ID:           ${sessionId}`);
-  printLine(`  ELAPSED TIME:         ${playTimeSec}s`);
+  printLine(`  ELAPSED TIME:         ${profile.totalPlayTimeMs / 1000}s`);
+  printLine(`  TYPING SPEED:         ${profile.typingSpeedWpm} WPM`);
+  printLine(`  AVG IDLE HESITATION:  ${profile.commandIdleTimeAvgMs}ms`);
   printLine(`  TOTAL DEATHS:         ${deaths}`);
   printLine(`  MISTAKES REGISTERED:  ${mistakes}`);
   printLine(`  ROOMS REVISITED:      ${roomsRevisited}`);
-  printLine(`  ASSIGNED TAGS:        ${Array.from(profileTagsEl.children).map(c => c.textContent).join(', ')}`);
+  printLine(`  ASSIGNED TAGS:        ${profile.tags.join(', ')}`);
+  printLine('--------------------------------------------------------');
+  printLine('  NEURAL PROFILE DUMP (RAW JSON):');
+  printLine(JSON.stringify(profile, null, 2));
   printLine('--------------------------------------------------------');
   printLine('  VERDICT: THE MACHINE REMEMBERS EVERYTHING YOU DID.');
   printLine('  THANK YOU FOR PLAYING WAKE.EXE.');
   printLine('========================================================\n');
 }
 
-// Command Handler
+// Commands
 function handleCommand(raw: string): void {
   if (isEndingPlayed) {
     printLine('Session concluded. Reload to awaken again.');
     return;
   }
 
-  // Active minigame intercepts input first
+  // Calculate idle time before acting
+  const now = Date.now();
+  const idleMs = now - lastCommandTimestamp;
+  idleTimeSamples.push(idleMs);
+  lastCommandTimestamp = now;
+
   if (activeMinigame) {
     const finished = activeMinigame.handleInput(raw);
     if (finished) {
@@ -399,7 +541,7 @@ function handleCommand(raw: string): void {
       if (parsed.item === 'ethanol' && inventory.has('ethanol')) {
         inventory.delete('ethanol');
         updateDistance(distance + 2);
-        printLine('You drink the ethanol. The chemical burn calms your racing thoughts. Distance +2!', 'bright');
+        printLine('You drink the ethanol. The chemical burn clears your mind. Distance +2!', 'bright');
       } else if (parsed.item === 'flashlight' && inventory.has('flashlight')) {
         printLine('The beam flickers, illuminating claw scratches on the ceiling.');
       } else {
@@ -452,8 +594,9 @@ function handleCommand(raw: string): void {
   }
 }
 
-// Telemetry & State Persistence
+// Telemetry & Sync
 async function syncState(): Promise<void> {
+  const profile = buildPlayerProfile();
   const state = {
     sessionId,
     currentRoom: currentRoomId,
@@ -462,7 +605,8 @@ async function syncState(): Promise<void> {
     solvedRooms: Array.from(solvedRooms),
     checkpointRoom: checkpointRoomId,
     deaths,
-    mistakes
+    mistakes,
+    playerProfile: profile
   };
   debugJsonEl.textContent = JSON.stringify(state, null, 2);
 
@@ -473,7 +617,7 @@ async function syncState(): Promise<void> {
       body: JSON.stringify(state)
     });
   } catch (e) {
-    // offline fallback
+    // offline
   }
 }
 
@@ -485,11 +629,11 @@ async function postTelemetry(type: string, data: any): Promise<void> {
       body: JSON.stringify({ sessionId, type, data })
     });
   } catch (e) {
-    // offline fallback
+    // offline
   }
 }
 
-// Boot & Initialization
+// Boot
 async function boot(): Promise<void> {
   printArt(TITLE_ART, 'bright');
   printLine('\n[SYSTEM INITIALIZED] Connecting to Ghost in the Machine...');
@@ -509,14 +653,8 @@ async function boot(): Promise<void> {
     ghostStatusEl.textContent = 'STANDALONE';
   }
 
-  // Populate initial lookahead queue indicators
-  queueSlotsEl.innerHTML = `
-    <div class="queue-slot">[SLOT 1] BEDROOM // WORDLE (STANDBY)</div>
-    <div class="queue-slot">[SLOT 2] HALLWAY // SIMON (STANDBY)</div>
-    <div class="queue-slot">[SLOT 3] KITCHEN // BLACKJACK (STANDBY)</div>
-  `;
-
   updateDistance(10);
+  renderQueueSlots();
   enterRoom('bedroom');
 }
 
@@ -524,6 +662,11 @@ async function boot(): Promise<void> {
 inputEl.addEventListener('keydown', (e) => {
   soundEngine.initOnGesture();
   soundEngine.playKeyClick();
+  keystrokeCount++;
+
+  // Simple typing speed tracking
+  const elapsedMinutes = Math.max(0.1, (Date.now() - startTime) / 60000);
+  typingSpeedWpm = Math.round((keystrokeCount / 5) / elapsedMinutes);
 
   if (e.key === 'Tab') {
     e.preventDefault();
@@ -576,5 +719,5 @@ closeDebugBtn.addEventListener('click', () => {
   debugModalEl.classList.add('hidden');
 });
 
-// Start the game!
+// Run boot
 boot();
