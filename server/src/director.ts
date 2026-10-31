@@ -108,6 +108,15 @@ export async function invokeDirector(
           } else if (!Array.isArray(parsed.taunts)) {
             parsed.taunts = ["You hesitated for {avg_think_s}."];
           }
+          if (parsed.difficulty_adjust && typeof parsed.difficulty_adjust === 'object') {
+            for (const [k, v] of Object.entries(parsed.difficulty_adjust)) {
+              if (typeof v !== 'number') {
+                delete parsed.difficulty_adjust[k];
+              }
+            }
+          } else {
+            parsed.difficulty_adjust = {};
+          }
         }
 
         const validatedResponse = DirectorResponseSchema.safeParse(parsed);

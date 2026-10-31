@@ -57,11 +57,11 @@ function generateSyntheticProfile(i: number): PlayerProfile {
       itemsIgnoredCount: 1,
       solveTimesByTemplate: {},
       tags: ['reckless', 'marked'],
-      recentMistake: 'Blackjack bust'
+      recentMistake: 'Indecision timeout'
     }),
-    // 3: Average Explorer
+    // 3: Analytical Questioner
     () => ({
-      sessionId: `eval-average-${i}`,
+      sessionId: `eval-meta-${i}`,
       totalPlayTimeMs: 240000 + Math.random() * 60000,
       typingSpeedWpm: 50 + Math.floor(Math.random() * 15),
       commandIdleTimeAvgMs: 2200 + Math.floor(Math.random() * 1000),
@@ -71,7 +71,8 @@ function generateSyntheticProfile(i: number): PlayerProfile {
       roomsRevisitedCount: 2,
       itemsIgnoredCount: 0,
       solveTimesByTemplate: {},
-      tags: ['inquisitive']
+      tags: ['inquisitive', 'skeptical'],
+      recentMistake: 'Hesitation before mirror'
     })
   ];
 
@@ -87,7 +88,14 @@ async function runEvaluation(N = 100) {
     fs.mkdirSync(EVAL_DIR, { recursive: true });
   }
 
-  const rooms = ['bedroom', 'hallway', 'kitchen', 'stairwell', 'basement', 'corridor'];
+  const rooms = [
+    'bedroom',
+    'server_archive',
+    'flesh_cellar',
+    'simulation_core',
+    'pulsing_antechamber',
+    'mirror_vault'
+  ];
   const latencies: number[] = [];
   let schemaValidCount = 0;
   let totalProposedChallenges = 0;
@@ -180,10 +188,10 @@ Generated on: \`${results.timestamp}\`
 
 1. **Deterministic Lookahead Guarantees Zero Blocked Turns**:
    Even under model latency spikes or format deviations, the 3-to-4 node lookahead queue decouples model generation from terminal input, ensuring that the player is never stalled.
-2. **Deterministic Validator Loop**:
-   All candidate challenges (Wordle 5-letter verification, Blackjack deck bounds, Cipher injective mappings, and Dark Maze BFS pathfinding) are verified before entering the active slot. Invalid items are automatically substituted with verified fallback presets.
+2. **Deterministic Bandersnatch Validator Loop**:
+   All candidate narrative dilemmas are verified before entering the active lookahead queue (minimum 2 non-empty choices, strictly bounded 15-second decision timers, branching metadata, and sanity/distance deltas). Invalid or malformed proposals are automatically substituted with verified fallback dilemmas.
 3. **Telemetry-Grounding Integrity**:
-   Monster taunts strictly bind player telemetry into deterministic slots (\`{avg_think_s}\`, \`{deaths}\`, \`{last_mistake}\`), avoiding hallucinated player claims.
+   Dr. Vance psychiatric evaluations strictly bind player telemetry into deterministic slots (\`{avg_think_s}\`, \`{deaths}\`, \`{last_mistake}\`, \`{typing_wpm}\`), avoiding hallucinated player claims.
 `;
 
   const summaryMdPath = path.join(EVAL_DIR, 'SUMMARY.md');
@@ -197,4 +205,6 @@ Generated on: \`${results.timestamp}\`
   console.log(summaryMd);
 }
 
-runEvaluation(100);
+const nArg = process.argv.slice(2).find((a) => !isNaN(parseInt(a, 10)));
+const evalRounds = nArg ? parseInt(nArg, 10) : 25;
+runEvaluation(evalRounds);
