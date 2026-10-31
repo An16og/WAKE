@@ -111,6 +111,16 @@ let typingSpeedWpm = 50;
 let lastDirectorData: any = null;
 let activeMinigame: any = null;
 let isEndingPlayed = false;
+let isDying = false;
+let isTransitioningRooms = false;
+
+function getDefaultNextRoom(roomId: string, branch: 'root' | 'meta' | 'beast'): string | null {
+  if (roomId === 'bedroom') return branch === 'beast' ? 'flesh_cellar' : 'server_archive';
+  if (roomId === 'server_archive') return 'simulation_core';
+  if (roomId === 'flesh_cellar') return 'pulsing_antechamber';
+  if (roomId === 'simulation_core' || roomId === 'pulsing_antechamber') return 'mirror_vault';
+  return null;
+}
 
 // Lookahead Queue State
 let lookaheadQueue: ChallengeItem[] = [];
@@ -432,13 +442,23 @@ function renderActionPills(room: any): void {
   if (choicesContainerEl) choicesContainerEl.innerHTML = '';
 
   if (room.id === 'mirror_vault') {
-    const mirrorPill = document.createElement('button');
-    mirrorPill.className = 'bs-choice-btn';
-    mirrorPill.textContent = 'LOOK INTO THE MIRROR';
-    mirrorPill.addEventListener('click', () => {
+    const isMeta = currentBranch === 'meta';
+    const pillA = document.createElement('button');
+    pillA.className = 'bs-choice-btn';
+    pillA.textContent = isMeta ? 'A: TOUCH THE TERMINAL SCREEN' : 'A: APPROACH THE OBSIDIAN MIRROR';
+    pillA.addEventListener('click', () => {
       triggerMirrorFinale();
     });
-    actionPillsEl.appendChild(mirrorPill);
+
+    const pillB = document.createElement('button');
+    pillB.className = 'bs-choice-btn';
+    pillB.textContent = isMeta ? 'B: BREACH THE 4TH WALL' : 'B: CONFRONT YOUR TRUE FACE';
+    pillB.addEventListener('click', () => {
+      triggerMirrorFinale();
+    });
+
+    actionPillsEl.appendChild(pillA);
+    actionPillsEl.appendChild(pillB);
     return;
   }
 
@@ -542,7 +562,12 @@ function enterRoom(roomId: string): void {
 function startRoomChallenge(template: string, defaultChallengeId?: string): void {
   let challengeToRun: ChallengeItem | null = null;
 
-  if (lookaheadQueue.length > 0) {
+  // Story rooms have designated dilemmas to ensure branch continuity
+  if (defaultChallengeId) {
+    challengeToRun = FALLBACK_CHALLENGES.find((c) => c.id === defaultChallengeId) || null;
+  }
+
+  if (!challengeToRun && lookaheadQueue.length > 0) {
     const matchIdx = lookaheadQueue.findIndex((c) => c.template === template);
     if (matchIdx >= 0) {
       challengeToRun = lookaheadQueue.splice(matchIdx, 1)[0];
@@ -554,8 +579,7 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
   }
 
   if (!challengeToRun) {
-    challengeToRun = FALLBACK_CHALLENGES.find((c) => c.id === defaultChallengeId) ||
-      FALLBACK_CHALLENGES.find((c) => c.template === template) ||
+    challengeToRun = FALLBACK_CHALLENGES.find((c) => c.template === template) ||
       FALLBACK_CHALLENGES[0];
     addLearningFeed(`> Lookahead fallback: Delivered static ${template}`);
   }
@@ -599,19 +623,21 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
       appendHistory(txt, cls);
     },
     onSuccess: () => {
+      if (isDying) return;
       solvedRooms.add(currentRoomId);
       activeMinigame = null;
-      setTimeout(() => {
-        minigameArenaEl.innerHTML = '';
-        minigameArenaEl.classList.add('hidden');
-      }, 900);
 
-      if (pendingNextRoomId) {
-        const next = pendingNextRoomId;
-        pendingNextRoomId = null;
+      const next = pendingNextRoomId || getDefaultNextRoom(currentRoomId, currentBranch);
+      pendingNextRoomId = null;
+
+      if (next) {
+        isTransitioningRooms = true;
         setTimeout(() => {
-          enterRoom(next);
-        }, 800);
+          isTransitioningRooms = false;
+          if (!isDying) {
+            enterRoom(next);
+          }
+        }, 1200);
       } else {
         renderActionPills(STORY_ROOMS[currentRoomId]);
       }
@@ -631,7 +657,12 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
 
 // Death & Respawn
 function triggerDeath(): void {
+  if (isDying) return;
+  isDying = true;
   deaths++;
+  activeMinigame = null;
+  isTransitioningRooms = false;
+
   recordTimelineEvent('death', 'THE THING CAUGHT YOU IN THE DARK', `Checkpoint reset to [${STORY_ROOMS[checkpointRoomId].name}]`);
   soundEngine.playSfx('monster_growl');
   setTimeout(() => soundEngine.playSfx('death_sting'), 300);
@@ -651,6 +682,8 @@ function triggerDeath(): void {
   setTimeout(() => {
     distance = 7;
     updateDistance(distance);
+    solvedRooms.delete(checkpointRoomId);
+    isDying = false;
     enterRoom(checkpointRoomId);
   }, 1400);
 }
@@ -668,6 +701,14 @@ async function triggerMirrorFinale(): Promise<void> {
 
   clearNarrative();
 
+  const updateSubtitle = async (text: string, delayMs: number = 2000): Promise<void> => {
+    if (subtitleEl) {
+      subtitleEl.textContent = text;
+      soundEngine.playKeyClick();
+    }
+    await new Promise((r) => setTimeout(r, delayMs));
+  };
+
   if (currentBranch === 'meta') {
     // ==========================================
     // PATH A: THE 4TH-WALL BREAK (META PSYCHOLOGICAL)
@@ -681,8 +722,7 @@ async function triggerMirrorFinale(): Promise<void> {
 
     soundEngine.playGlitchNoise();
     soundEngine.playSfx('whisper');
-    if (subtitleEl) subtitleEl.textContent = 'The antique mirror fractures into green CRT phosphor code...';
-    await new Promise((r) => setTimeout(r, 1500));
+    await updateSubtitle('The antique mirror fractures into green CRT phosphor code...', 1800);
 
     soundEngine.playGlitchNoise();
     soundEngine.playSfx('death_sting');
@@ -690,28 +730,40 @@ async function triggerMirrorFinale(): Promise<void> {
     printNarrative('> SUBJECT 09: Daniel Vance status - PSEUDO-CONSCIOUS', 'bright');
     printNarrative('> MEMORY ACCESS: Simulated protagonist has reached boundary.', 'bright');
     printNarrative('> CRITICAL WARNING: External operator detected at keyboard.', 'danger');
-    if (subtitleEl) subtitleEl.textContent = 'The screen displays your exact keystroke cadence and typing hesitation.';
-    await new Promise((r) => setTimeout(r, 1800));
+    await updateSubtitle('The screen displays your exact keystroke cadence and typing hesitation.', 2000);
 
     soundEngine.playGlitchNoise();
     soundEngine.playSfx('monster_growl');
     printNarrative('\nYOU WERE NEVER RUNNING THROUGH A HAUNTED HOUSE.', 'bright');
     printNarrative('YOU ARE SITTING AT A DESK IN THE DARK.', 'danger');
     printNarrative('WHO IS CONTROLLING THE MACHINE... AND WHO IS CONTROLLING YOU?\n', 'danger');
-    if (subtitleEl) subtitleEl.textContent = 'SIMULATION RUNTIME TERMINATED. YOU HAVE BREACHED THE 4TH WALL.';
-    await new Promise((r) => setTimeout(r, 2200));
 
-    // Typewriter Monologue for The 4th-Wall Break
+    // Show in-image finale reveal
+    if (overlayEl) {
+      const mainLine = overlayEl.querySelector('.reveal-line-main');
+      const subLine = overlayEl.querySelector('.reveal-line-sub');
+      if (mainLine) mainLine.textContent = 'REALITY MATRIX COLLAPSED.';
+      if (subLine) subLine.textContent = 'YOU ARE SITTING AT A DESK IN THE DARK. WHO IS CONTROLLING YOU?';
+      overlayEl.classList.remove('hidden');
+    }
+    await updateSubtitle('REALITY MATRIX COLLAPSED: You are sitting at a physical keyboard in the dark.', 2400);
+
+    // Dynamic typewriter monologue delivered right to the screen subtitle
+    const monologue = [
+      'You weighed every 15-second dilemma in the silence.',
+      'You believed you were guiding a survivor through an old house.',
+      'Dr. Vance was never a doctor. The terminal was compiling a predictive mirror of YOU.',
+      'The horror was never inside the code. Who is controlling you?',
+      'WAKE.EXE // Created by Anuj Jain (github: https://www.github.com/An16og)'
+    ];
+
     printNarrative('========================================================', 'bright');
     printNarrative('             PROJECT WAKE // CLOSING MONOLOGUE          ', 'bright');
     printNarrative('========================================================\n');
-    printNarrative('  You weighed every 15-second dilemma in the silence.');
-    printNarrative('  You believed you were guiding a survivor through an old house.');
-    printNarrative('  Dr. Vance was never a doctor.');
-    printNarrative('  The terminal was compiling a predictive mirror of YOU.');
-    printNarrative('  Your hesitation, your panic, your keystroke rhythms.');
-    printNarrative('  The horror was never inside the code.');
-    printNarrative('  The horror is that you never questioned what was watching you back.');
+    for (const line of monologue) {
+      printNarrative(`  ${line}`);
+      await updateSubtitle(line, 2200);
+    }
     printNarrative('\n========================================================', 'bright');
     printNarrative('                     WAKE.EXE                           ', 'bright');
     printNarrative('               Created by Anuj Jain                     ', 'bright');
@@ -729,57 +781,61 @@ async function triggerMirrorFinale(): Promise<void> {
 
     // Stage 0: Calm human reflection in mirror
     doomRenderer.setMirrorMorphStage(0);
-    if (subtitleEl) subtitleEl.textContent = 'You look into the antique glass. Your reflection stares back in silence.';
     soundEngine.playSfx('breath');
     soundEngine.playKeyClick();
-    await new Promise((r) => setTimeout(r, 1400));
+    await updateSubtitle('You look into the antique glass. Your reflection stares back in silence.', 1600);
 
     // Stage 1: Corruption starts, horns sprout, zoom 1.35x
     doomRenderer.setMirrorMorphStage(1);
     soundEngine.playSfx('whisper');
     soundEngine.playGlitchNoise();
-    if (subtitleEl) subtitleEl.textContent = 'The reflection twitches... curved horns pierce upward from your skull.';
-    await new Promise((r) => setTimeout(r, 1400));
+    await updateSubtitle('The reflection twitches... curved horns pierce upward from your skull.', 1600);
 
     // Stage 2: Fangs & Glass fractures, zoom 1.8x
     doomRenderer.setMirrorMorphStage(2);
     soundEngine.playSfx('mirror_crack');
     soundEngine.playGlitchNoise();
-    if (subtitleEl) subtitleEl.textContent = 'The glass cracks. Your jaw splits open into razor predator fangs.';
-    await new Promise((r) => setTimeout(r, 1400));
+    await updateSubtitle('The glass cracks. Your jaw splits open into razor predator fangs.', 1600);
 
     // Stage 3: Monster face fills mirror frame, zoom 2.3x
     doomRenderer.setMirrorMorphStage(3);
     soundEngine.playSfx('monster_growl');
     soundEngine.playGlitchNoise();
-    if (subtitleEl) subtitleEl.textContent = 'The footsteps behind me were my own paws. I was never running from the thing.';
-    await new Promise((r) => setTimeout(r, 1600));
+    await updateSubtitle('The footsteps behind me were my own paws. I was never running from the thing.', 1800);
 
     // Stage 4: Glass shatters! Beast face enlarges to fill entire screen!
     doomRenderer.setMirrorMorphStage(4);
     soundEngine.playSfx('death_sting');
     soundEngine.playGlitchNoise();
-    await new Promise((r) => setTimeout(r, 800));
 
-    if (subtitleEl) subtitleEl.textContent = '';
     if (overlayEl) {
+      const mainLine = overlayEl.querySelector('.reveal-line-main');
+      const subLine = overlayEl.querySelector('.reveal-line-sub');
+      if (mainLine) mainLine.textContent = 'IT WAS YOU ALL ALONG.';
+      if (subLine) subLine.textContent = 'I WAS NEVER RUNNING FROM THE MONSTER. I AM THE THING.';
       overlayEl.classList.remove('hidden');
     }
 
     printNarrative('I WAS NEVER RUNNING FROM THE MONSTER.', 'bright');
     printNarrative('I AM THE MONSTER.', 'danger');
-    await new Promise((r) => setTimeout(r, 2200));
+    await updateSubtitle('I WAS NEVER RUNNING FROM THE MONSTER. I AM THE MONSTER.', 2400);
 
-    // Typewriter Monologue for The Beast Awakening
+    // Dynamic typewriter monologue delivered right to the screen subtitle
+    const monologue = [
+      'The house was never breached from outside. Every deadbolt was turned from within.',
+      'You fled through darkened corridors, terrified of the shadow.',
+      'Only to realize the claws tearing the drywall were your own.',
+      'The predator did not hunt you down. You simply discarded the fragile human skin.',
+      'WAKE.EXE // Created by Anuj Jain (github: https://www.github.com/An16og)'
+    ];
+
     printNarrative('\n========================================================', 'bright');
     printNarrative('             PROJECT WAKE // CLOSING MONOLOGUE          ', 'bright');
     printNarrative('========================================================\n');
-    printNarrative('  The house was never breached from outside.');
-    printNarrative('  Every deadbolt was turned from the inside.');
-    printNarrative('  You fled through darkened corridors, terrified of the shadow,');
-    printNarrative('  only to realize the claws tearing the drywall were your own.');
-    printNarrative('  The predator did not hunt you down.');
-    printNarrative('  You simply discarded the fragile human skin.');
+    for (const line of monologue) {
+      printNarrative(`  ${line}`);
+      await updateSubtitle(line, 2200);
+    }
     printNarrative('\n========================================================', 'bright');
     printNarrative('                     WAKE.EXE                           ', 'bright');
     printNarrative('               Created by Anuj Jain                     ', 'bright');
@@ -787,12 +843,16 @@ async function triggerMirrorFinale(): Promise<void> {
     printNarrative('========================================================\n');
   }
 
-  await new Promise((r) => setTimeout(r, 2500));
   displayEndingFile();
 }
 
 function displayEndingFile(): void {
   const profile = buildPlayerProfile();
+  const subtitleEl = document.getElementById('scene-subtitle');
+  if (subtitleEl) {
+    subtitleEl.textContent = '[SIMULATION CONCLUDED] Click [REPLAY SIMULATION] or [SAVE GAMEPLAY] below, or type "replay" / "save".';
+  }
+
   printNarrative('\n========================================================', 'bright');
   printNarrative('       THE FILE IT KEPT ON YOU [FINAL DOSSIER]          ', 'bright');
   printNarrative('========================================================');
@@ -882,6 +942,8 @@ function restartGame(): void {
   solvedRooms.clear();
   visitedRooms.clear();
   isEndingPlayed = false;
+  isDying = false;
+  isTransitioningRooms = false;
   currentBranch = 'root';
   sanity = 10;
   timelinePath.length = 0;
@@ -906,18 +968,34 @@ function restartGame(): void {
 
 // Command Handler
 function handleCommand(raw: string): void {
+  const clean = raw.trim().toLowerCase();
+
   if (isEndingPlayed) {
-    const clean = raw.trim().toLowerCase();
-    if (clean === 'replay' || clean === 'restart' || clean === 'again') {
+    if (clean === 'replay' || clean === 'restart' || clean === 'again' || clean === 'r') {
       restartGame();
       return;
     }
-    if (clean === 'save' || clean === 'export' || clean === 'download') {
+    if (clean === 'save' || clean === 'export' || clean === 'download' || clean === 's') {
       exportSessionDossier();
       return;
     }
     printNarrative('Session concluded. Click [REPLAY SIMULATION] or [EXPORT DOSSIER], or type "replay" / "save".');
+    const subtitleEl = document.getElementById('scene-subtitle');
+    if (subtitleEl) subtitleEl.textContent = 'Session concluded. Click [REPLAY SIMULATION] or [EXPORT DOSSIER], or type "replay" / "save".';
     return;
+  }
+
+  // If in mirror vault, ANY interaction triggers the finale
+  if (currentRoomId === 'mirror_vault') {
+    if (
+      clean === 'a' || clean === 'b' || clean === '1' || clean === '2' ||
+      clean.includes('look') || clean.includes('mirror') || clean.includes('screen') ||
+      clean.includes('glass') || clean.includes('approach') || clean.includes('breach') ||
+      clean.includes('touch') || clean === ''
+    ) {
+      triggerMirrorFinale();
+      return;
+    }
   }
 
   const now = Date.now();
@@ -935,19 +1013,27 @@ function handleCommand(raw: string): void {
     return;
   }
 
+  // If transitioning between rooms, ignore spam gracefully
+  if (isTransitioningRooms) {
+    return;
+  }
+
   const parsed = parseCommand(raw);
 
   switch (parsed.type) {
     case 'look':
-      if (currentRoomId === 'mirror_vault' || parsed.target === 'mirror') {
+      if (currentRoomId === 'mirror_vault' || parsed.target === 'mirror' || parsed.target?.includes('screen')) {
         triggerMirrorFinale();
       } else {
         const room = STORY_ROOMS[currentRoomId];
         clearNarrative();
+        const subtitleEl = document.getElementById('scene-subtitle');
         if (sanity <= 5 && room.firstPersonDrift && room.firstPersonDrift.length > 0) {
           for (const l of room.firstPersonDrift) printNarrative(l);
+          if (subtitleEl) subtitleEl.textContent = room.firstPersonDrift[0] || '';
         } else {
           for (const l of room.narration) printNarrative(l);
+          if (subtitleEl) subtitleEl.textContent = room.narration[0] || '';
         }
         renderActionPills(room);
       }
@@ -995,10 +1081,15 @@ function handleCommand(raw: string): void {
     case 'action':
       if (parsed.verb === 'konami') {
         triggerKonamiJumpscare();
-      } else if (parsed.verb === 'approach' && parsed.arg === 'mirror' && currentRoomId === 'mirror_vault') {
+      } else if (
+        (parsed.verb === 'approach' || parsed.verb === 'touch' || parsed.verb === 'breach' || parsed.verb === 'screen' || parsed.verb === 'mirror') &&
+        currentRoomId === 'mirror_vault'
+      ) {
+        triggerMirrorFinale();
+      } else if (currentRoomId === 'mirror_vault') {
         triggerMirrorFinale();
       } else {
-        printNarrative(`Unknown action: "${raw}". Type "help" or click an available choice above.`);
+        printNarrative(`Choose [A] or [B], or type "help" for options.`);
       }
       break;
 

@@ -494,14 +494,22 @@ export class BandersnatchRunner {
     if (this.isResolved) return true;
     const clean = input.trim().toUpperCase();
 
-    // Determine choice index (A, B, C or 1, 2, 3)
+    // Determine choice index (A, B, C or 1, 2, 3, or keyword matching)
     let idx = -1;
     if (clean === 'A' || clean === '1') idx = 0;
     else if (clean === 'B' || clean === '2') idx = 1;
     else if (clean === 'C' || clean === '3') idx = 2;
     else {
       for (let i = 0; i < this.choices.length; i++) {
-        if (clean.includes(this.choices[i].id.toUpperCase()) || clean.includes(this.choices[i].label.toUpperCase())) {
+        const idUpper = (this.choices[i].id || '').toUpperCase();
+        const labelUpper = (this.choices[i].label || '').toUpperCase();
+        const descUpper = (this.choices[i].description || '').toUpperCase();
+        if (
+          (clean.length >= 3 && labelUpper.includes(clean)) ||
+          (clean.length >= 3 && descUpper.includes(clean)) ||
+          clean.includes(idUpper) ||
+          clean.includes(labelUpper)
+        ) {
           idx = i;
           break;
         }
@@ -509,6 +517,15 @@ export class BandersnatchRunner {
     }
 
     if (idx < 0 || idx >= this.choices.length) {
+      if (clean === 'LOOK' || clean === 'L' || clean.includes('EXAMINE') || clean.includes('INSPECT')) {
+        this.state.print(`[DILEMMA]: ${this.scenario}`, 'bright');
+        if (this.subtitleEl) this.subtitleEl.textContent = this.scenario;
+        return false;
+      }
+      if (clean === 'HELP' || clean === '?') {
+        this.state.print('Decide your path: Type [A] or [B], or click the buttons above.', 'bright');
+        return false;
+      }
       return false;
     }
 
