@@ -10,9 +10,7 @@
   },
   "dependencies": {
     "@wake/content": "*",
-    "@wake/shared": "*"
-  },
-  "devDependencies": {
+    "@wake/shared": "*",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"
   }
