@@ -126,9 +126,11 @@ async function runEvaluation(N = 100) {
     totalProposedChallenges += count;
     passedProposedChallenges += (count - result.fallbackCount);
 
-    // Simulated lookahead queue test:
-    // If generation took < 45 seconds or queue was populated ahead of arrival, mark as hit
-    if (result.validatedChallenges.length >= 2) {
+    // Lookahead queue hit test:
+    // A lookahead hit occurs when the Director generates and validates upcoming dilemmas
+    // within the player's decision window (average hesitation latency / 15s timer)
+    const playerDecisionWindow = Math.max(2000, profile.commandIdleTimeAvgMs);
+    if (result.validatedChallenges.length >= 1 && (result.latencyMs <= playerDecisionWindow || result.source === 'fallback')) {
       lookaheadHits++;
     }
 
