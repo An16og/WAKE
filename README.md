@@ -12,17 +12,18 @@ An open-weight model (**Gemma**, running locally via Ollama or an OpenAI-compati
 
 - **Retro CRT Experience**: Authentic phosphor green / monochrome toggle, scanlines, CRT curvature, and retro bitmap typography (`VT323`).
 - **Deterministic Game Engine**: The model never controls state or rules. Code owns state; deterministic validators guarantee every minigame is solvable and fair.
-- **5 Verified Minigames**:
-  1. **Wordle-style**: 5-letter word puzzle chosen from 300 curated horror words, with color/ASCII feedback.
-  2. **Blackjack vs The Thing**: Fair-odds card match where stakes are Distance points.
-  3. **Cipher Decryption**: Caesar, Atbash, and Monoalphabetic substitution locks.
-  4. **Breaker Simon**: Rapid glyph memory sequence repeat.
-  5. **Dark Maze**: Fog-of-war labyrinth with BFS pathfinding reachability verification.
+- **Pure Bandersnatch Choice Engine**: No disconnected mini-puzzles or inventory grind. Every room is driven by tense 15-second timed split-second dilemmas where your moral and psychological instincts directly sculpt the narrative.
+- **Dual Divergent Climax Endings**:
+  1. **The Beast Awakening**: Embracing predatory feral rage, transforming into the very monster you thought was stalking you.
+  2. **The 4th-Wall Simulation Break**: Decrypting Vance's mainframe, peeling back phosphor scanlines, and looking out through the glass of the CRT monitor directly at the human user at the keyboard.
+- **Sanity Distortion & 1-Bit Retro Rasterizer**: Custom 320x180 canvas engine featuring authentic Atkinson dithering, Macintosh stippling, and dynamic sanity distortion that bends reality as your psychological grip falters.
+- **Case Branch Map & Chronological Timeline**: Dedicated Logs & History suite rendering a live branching decision tree, psychometric profile telemetry, and Dr. Vance's clinical observer feed.
+- **Exportable Psychological Dossier**: Downloadable `.txt` file unsealing your complete autonomic telemetry profile (WPM, hesitation latency, assigned behavioral tags, and clinical evaluation).
 - **The Visible AI Layer**:
   - Live `GHOST // PROCESS` telemetry panel showing provider, model, latency, lookahead queue slots, and active psychological tags (*cautious*, *reckless*, *fast typist*, *marked*).
   - Telemetry-grounded taunts: Strict placeholder interpolation (`{avg_think_s}`, `{deaths}`, `{last_mistake}`, `{typing_wpm}`) ensures zero hallucinated player facts.
   - Resilience: Automatic fallback preset substitution if the model is unreachable or fails schema validation.
-- **Procedural & Offline Audio**: Web Audio synthesizer generating hums, clicks, and a dynamic heartbeat that accelerates as the Distance meter shrinks. Includes an offline ElevenLabs SFX generator tool.
+- **Procedural & Offline Audio**: Dual-engine audio pairing high-fidelity ElevenLabs generated soundscapes and dark ambient BGM with a seamless procedural Web Audio synthesizer and dynamic heartbeat acceleration.
 - **Accessible & Safe**: Safe Mode toggle (disables screen flicker and audio spikes) and `prefers-reduced-motion` compliance.
 
 ---
@@ -32,28 +33,30 @@ An open-weight model (**Gemma**, running locally via Ollama or an OpenAI-compati
 ```mermaid
 flowchart TD
     subgraph Browser ["Client (Vite + TypeScript)"]
-        UI["Terminal Interface & CRT Canvas"]
-        Parser["Deterministic Parser"]
+        UI["Terminal Interface & CRT Canvas (VT323)"]
+        Parser["Deterministic Input Parser"]
         SidePanel["GHOST // PROCESS Panel"]
-        Audio["Web Audio Procedural Engine"]
-        Runner["Minigame Runners"]
+        Audio["Hybrid Audio (ElevenLabs + Web Audio)"]
+        Runner["Bandersnatch Choice Runner (15s Timer)"]
+        BranchMap["Case Branch Map & Dossier Tab"]
     end
 
     subgraph Server ["Server (Node + Fastify)"]
-        API["API & Static Asset Server"]
-        Director["Director Engine"]
-        Queue["Lookahead Queue (3-4 Slots)"]
-        Validators["Deterministic Validators (BFS, Dictionaries, Deck Math)"]
-        DB["MongoDB Atlas (Runs & Telemetry Fallback)"]
-        Sentry["Sentry Observability Spans"]
+        API["Fastify API & Static SPA Server"]
+        Director["Dr. Vance Neuromorphic Director"]
+        Queue["Lookahead Dilemma Queue (3-4 Slots)"]
+        DB["MongoDB Atlas (Runs & Events Collections)"]
+        Sentry["Sentry AI Observability Spans"]
     end
 
-    subgraph AI ["Local Open-Weight Model"]
-        Ollama["Ollama (Gemma Model)"]
+    subgraph AI ["Model Inference Layer"]
+        Ollama["Local Gemma (Ollama / OpenAI-compat)"]
+        Fallback["Deterministic Dr. Vance Fallback"]
     end
 
     UI --> Parser
     Parser --> Runner
+    Runner --> BranchMap
     Runner --> SidePanel
     SidePanel --> Audio
 
@@ -61,7 +64,7 @@ flowchart TD
     API --> Director
     Director --> Queue
     Director --> Ollama
-    Director --> Validators
+    Director -. "On Latency/Disconnect" .-> Fallback
     Director --> Sentry
     API -.-> DB
 ```
