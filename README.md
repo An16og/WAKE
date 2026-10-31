@@ -76,7 +76,7 @@ flowchart TD
 
 ### 1. Installation
 ```bash
-git clone https://github.com/anujjainaj/WAKE.git
+git clone https://github.com/An16og/WAKE.git
 cd WAKE
 npm install
 ```
@@ -143,6 +143,37 @@ The project includes `render.yaml` for one-click deployment:
    - `MONGODB_URI=<your-atlas-connection-string>`
    - `SENTRY_DSN=<your-sentry-dsn>`
 4. Point your custom `.tech` domain (via CNAME) to the Render web service URL.
+
+---
+
+## 🏆 Hackathon Sponsor Tracks & Integrations
+
+### 1. GitHub Copilot Track
+- **Merged PR**: [PR #1: fix/ci-build-pipeline](https://github.com/An16og/WAKE/pull/1) (Merged in commit `268086d`).
+- **Impact**: GitHub Copilot diagnosed and resolved a monorepo workspace TypeScript compilation race condition in `.github/workflows/ci.yml`. Because `@wake/shared` and `@wake/content` emit declaration files needed by `client` and `server`, running `npm run typecheck` before `npm run build` failed in clean CI environments. Copilot generated the precise CI step addition and comprehensive pull request description.
+
+### 2. MongoDB Atlas Track
+- **Implementation**: [`server/src/db.ts`](server/src/db.ts).
+- **Collections**:
+  - `runs`: Stores player game state snapshots (`sessionId`, `currentRoom`, `distance`, `playerProfile`, `checkpointRoom`, `inventory`, `updatedAt`).
+  - `events`: Real-time behavioral telemetry event stream (`room_visit`, `choice_made`, `mistake`, `death`).
+- **Resilience**: Features automatic graceful degradation to an in-memory repository when running offline without `MONGODB_URI`.
+
+### 3. Sentry AI Observability Track
+- **Implementation**: [`server/src/director.ts`](server/src/director.ts).
+- **Instrumentation**:
+  - Custom Sentry AI span: `Director.invoke` (`op: gen_ai.director`).
+  - Recorded telemetry attributes: `gen_ai.system`, `gen_ai.request.model`, `wake.room_id`, `wake.player.tags`, `gen_ai.response.latency_ms`, `wake.validation.retry_count`, `wake.validation.fallback_count`, and `wake.source`.
+  - Captures AI execution latencies, schema validation retries, fallback substitutions, and director errors.
+
+### 4. ElevenLabs SDX (Sound Effects) Track
+- **Implementation**: [`tools/src/generate-sfx.ts`](tools/src/generate-sfx.ts) runnable via `npm run generate-sfx`.
+- **Horror Soundscapes**: Prompts engineered for psychological dread (e.g. binaural whispers, deep monster throat rumbles, heavy wood creaks, glass fractures, and dark ambient background drone).
+- **Dual-Engine Audio**: High-fidelity ElevenLabs generated audio with automatic zero-dependency procedural Web Audio synthesizer fallbacks for offline play.
+
+### 5. Render & .tech Domain Track
+- **Deployment**: [`render.yaml`](render.yaml) defines a turnkey production Node 22 Web Service serving the Fastify API and compiled Vite client SPA.
+- **Custom Domain**: DNS CNAME mapping ready for `.tech` domain registration.
 
 ---
 
