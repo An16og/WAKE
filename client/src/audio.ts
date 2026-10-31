@@ -17,6 +17,7 @@ class SoundEngine {
   private bgmLfo: OscillatorNode | null = null;
   private bgmChordTimer: any = null;
   private bgmChimeTimer: any = null;
+  private bgmAudio: HTMLAudioElement | null = null;
 
   private heartbeatIntervalId: any = null;
   private distance: number = 10;
@@ -48,6 +49,13 @@ class SoundEngine {
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
+    if (this.bgmAudio) {
+      if (this.isMuted) {
+        this.bgmAudio.pause();
+      } else {
+        this.bgmAudio.play().catch(() => {});
+      }
+    }
     if (this.ctx) {
       if (this.isMuted) {
         this.ctx.suspend().catch(() => {});
@@ -71,6 +79,9 @@ class SoundEngine {
 
   public setSafeMode(safe: boolean): void {
     this.isSafeMode = safe;
+    if (this.bgmAudio) {
+      this.bgmAudio.volume = this.isSafeMode ? 0.08 : 0.18;
+    }
     if (this.bgmGain && this.ctx) {
       this.bgmGain.gain.setValueAtTime(this.isSafeMode ? 0.025 : 0.05, this.ctx.currentTime);
     }
@@ -178,6 +189,18 @@ class SoundEngine {
 
       // Random high music-box glass chimes that gently ring in the dark
       this.scheduleNextBgmChime();
+
+      // Stream high-fidelity ElevenLabs generated dark ambient soundtrack loop
+      try {
+        this.bgmAudio = new Audio('/sfx/bgm.mp3');
+        this.bgmAudio.loop = true;
+        this.bgmAudio.volume = this.isSafeMode ? 0.08 : 0.18;
+        this.bgmAudio.play().catch(() => {
+          // Autoplay policy or offline - procedural synthesizer is already running
+        });
+      } catch (err) {
+        // Procedural fallback continues smoothly
+      }
     } catch (e) {
       console.warn('[SoundEngine] BGM init error:', e);
     }
