@@ -112,7 +112,7 @@
             <button id="view-mode-timeline" class="subtab-btn active">[ STORY TIMELINE ]</button>
             <button id="view-mode-terminal" class="subtab-btn">[ RAW STREAM ]</button>
           </div>
-          <button id="btn-export-dossier-tab" class="subtab-btn action-btn">[ 💾 EXPORT DOSSIER ]</button>
+          <button id="btn-export-dossier-tab" class="subtab-btn action-btn">[ EXPORT DOSSIER ]</button>
         </div>
       </div>
 
@@ -168,6 +168,15 @@
               <div class="queue-slot empty">[SLOT 1] PENDING</div>
               <div class="queue-slot empty">[SLOT 2] PENDING</div>
               <div class="queue-slot empty">[SLOT 3] PENDING</div>
+            </div>
+          </div>
+
+          <!-- Case Branch Map -->
+          <div class="telemetry-card branch-card">
+            <div class="pane-header">ACTIVE TIMELINE BRANCH MAP</div>
+            <div class="card-explainer">Real-time Bandersnatch causal graph showing active &amp; collapsed timelines:</div>
+            <div id="case-branch-map" class="case-branch-map">
+              <!-- Dynamically populated branch tree -->
             </div>
           </div>
 

@@ -17,6 +17,7 @@ export interface MinigameState {
   onMistake: (penaltyDistance: number, mistakeName: string) => void;
   onDistanceChange?: (delta: number) => void;
   onChoiceMade?: (label: string, consequence: string) => void;
+  onChoiceSelected?: (choice: any) => void;
   print: (text: string, className?: string) => void;
 }
 
@@ -480,6 +481,11 @@ export class BandersnatchRunner {
     if (this.state.onChoiceMade) {
       this.state.onChoiceMade('TIMED OUT (INDECISION)', 'The beast closed distance in the dark!');
     }
+    const defaultIdx = this.state.params.defaultChoiceIndex || 0;
+    const defaultChoice = this.choices[defaultIdx] || this.choices[0];
+    if (defaultChoice && this.state.onChoiceSelected) {
+      this.state.onChoiceSelected(defaultChoice);
+    }
     this.state.onMistake(2, 'Bandersnatch timer expired');
     this.state.onSuccess();
   }
@@ -527,6 +533,10 @@ export class BandersnatchRunner {
 
     if (this.state.onChoiceMade) {
       this.state.onChoiceMade(choice.label, choice.consequence);
+    }
+
+    if (this.state.onChoiceSelected) {
+      this.state.onChoiceSelected(choice);
     }
 
     if (choice.distanceDelta !== 0 && this.state.onDistanceChange) {

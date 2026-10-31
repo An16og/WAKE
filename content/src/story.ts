@@ -4,13 +4,13 @@ export interface RoomExit {
   direction: 'north' | 'south' | 'east' | 'west' | 'up' | 'down';
   targetRoomId: string;
   locked?: boolean;
-  requiredItem?: string;
   lockDescription?: string;
 }
 
 export interface StoryRoom {
   id: string;
   name: string;
+  branch?: 'meta' | 'beast' | 'root';
   narration: string[];
   firstPersonDrift: string[];
   challengeTemplate?: ChallengeTemplate;
@@ -23,171 +23,118 @@ export interface StoryRoom {
 export const STORY_ROOMS: Record<string, StoryRoom> = {
   bedroom: {
     id: 'bedroom',
-    name: 'COLD BEDROOM',
+    name: 'ROOM 01 // THE AWAKENING',
+    branch: 'root',
     narration: [
-      'You open your eyes. The mattress is damp with perspiration.',
-      'A metallic screech echoes beneath the floorboards.',
-      'You know without looking that something impossible is tracking your scent.'
+      'You open your eyes in suffocating darkness. The mattress is damp with perspiration.',
+      'On the nightstand, an antique rotary telephone rings violently: RRR-ING... RRR-ING...',
+      'Behind the closet door, sharp nails scrape frantically against the plaster.'
     ],
     firstPersonDrift: [
       'I woke up drenched in cold sweat.',
-      'Something moved in the floorboards beneath my feet.'
+      'The telephone wouldn\'t stop ringing. Something was breathing inside the walls.'
     ],
     challengeTemplate: 'bandersnatch',
-    defaultChallengeId: 'fallback-bandersnatch-5',
-    exits: [
-      { direction: 'north', targetRoomId: 'hallway', locked: false }
-    ],
-    items: ['flashlight', 'iron_key'],
-    checkpoint: true
-  },
-
-  hallway: {
-    id: 'hallway',
-    name: 'FLICKERING HALLWAY',
-    narration: [
-      'A narrow gallery lined with peeling wallpaper.',
-      'A single bulb swings overhead, humming at 60 Hz.',
-      'The junction box on the wall sparked when you stepped inside.',
-      'You hear heavy footsteps drag across the wood behind you.'
-    ],
-    firstPersonDrift: [
-      'The hallway smelled like ozone and old wet timber.',
-      'The footsteps were keeping pace with my heartbeat.'
-    ],
-    challengeTemplate: 'bandersnatch',
-    defaultChallengeId: 'fallback-bandersnatch-2',
-    exits: [
-      { direction: 'south', targetRoomId: 'bedroom' },
-      { direction: 'north', targetRoomId: 'kitchen', locked: true, lockDescription: 'The electrical latch is dead. Resolve the corridor dilemma to push through.' }
-    ],
-    items: ['chalk'],
-    checkpoint: false
-  },
-
-  kitchen: {
-    id: 'kitchen',
-    name: 'RUINED KITCHEN',
-    narration: [
-      'Black grease coats the counters. Flies circle the rusted sink.',
-      'At the wooden table sits a hunched silhouette, tapping long segmented claws.',
-      'It does not look up. "Play your choice," a voice rattles inside your skull.',
-      '"Or I step closer."'
-    ],
-    firstPersonDrift: [
-      'The grease on the table smelled familiar.',
-      'The voice in my skull felt less like a threat and more like memory.'
-    ],
-    challengeTemplate: 'bandersnatch',
-    defaultChallengeId: 'fallback-bandersnatch-4',
-    exits: [
-      { direction: 'south', targetRoomId: 'hallway' },
-      { direction: 'east', targetRoomId: 'pantry' },
-      { direction: 'north', targetRoomId: 'stairwell', locked: true, lockDescription: 'The Thing blocks the doorway with its long arms until you make your move.' }
-    ],
-    items: ['salt_shaker'],
-    checkpoint: true
-  },
-
-  pantry: {
-    id: 'pantry',
-    name: 'DARK PANTRY (OPTIONAL ALCOVE)',
-    narration: [
-      'Shelves loaded with rotten cans labeled in a script you cannot read.',
-      'You find a bottle of pure medical ethanol.',
-      'Drinking a sip clears the static in your mind. The monster paused outside.'
-    ],
-    firstPersonDrift: [
-      'I hid among the rotten cans. The monster waited outside, listening.'
-    ],
-    challengeTemplate: 'bandersnatch',
-    defaultChallengeId: 'fallback-bandersnatch-7',
-    exits: [
-      { direction: 'west', targetRoomId: 'kitchen' }
-    ],
-    items: ['ethanol', 'journal_page'],
-    checkpoint: false
-  },
-
-  stairwell: {
-    id: 'stairwell',
-    name: 'ROTTED STAIRWELL',
-    narration: [
-      'Steps descend into absolute blackness. The air turns freezing cold.',
-      'A terrifying shriek reverberates down the stairs directly behind your heels.',
-      'You are trapped between two desperate options as footsteps plunge toward you.'
-    ],
-    firstPersonDrift: [
-      'I bolted down the stairs in the dark.',
-      'The footsteps behind me were gaining fast.'
-    ],
-    challengeTemplate: 'bandersnatch',
-    defaultChallengeId: 'fallback-bandersnatch-1',
-    exits: [
-      { direction: 'south', targetRoomId: 'kitchen' },
-      { direction: 'down', targetRoomId: 'basement', locked: true, lockDescription: 'You must resolve the split-second escape dilemma to reach the landing.' }
-    ],
+    defaultChallengeId: 'bandersnatch-bedroom-dilemma',
+    exits: [],
     items: [],
     checkpoint: true
   },
 
-  basement: {
-    id: 'basement',
-    name: 'CONCRETE BASEMENT',
+  server_archive: {
+    id: 'server_archive',
+    name: 'SECTOR 4 // THE SERVER ARCHIVE',
+    branch: 'meta',
     narration: [
-      'Pipes rattle overhead, spitting hot vapor.',
-      'An iron furnace screams in the center at critical pressure.',
-      'The shadow behind you is now six feet long. You feel hot breath on your neck.'
+      'The bedroom walls peeled away into towering mainframe server racks.',
+      'Green CRT screens line the corridor, rendering real-time keystroke logs and browser telemetry.',
+      'A voice synthesizes from overhead speakers: "Identity mismatch detected. Who sits at the input bar?"'
     ],
     firstPersonDrift: [
-      'The heat from the furnace felt like my own skin burning.',
-      'I looked at my shadow. It didn\'t have human shoulders.'
+      'The wallpaper dissolved into green phosphor scanlines.',
+      'I could see my own thoughts blinking on the terminals like computer memory.'
     ],
     challengeTemplate: 'bandersnatch',
-    defaultChallengeId: 'fallback-bandersnatch-3',
-    exits: [
-      { direction: 'up', targetRoomId: 'stairwell' },
-      { direction: 'north', targetRoomId: 'corridor', locked: true, lockDescription: 'The furnace steam lock blocks the heavy iron bulkhead.' }
-    ],
-    items: ['wrench'],
+    defaultChallengeId: 'bandersnatch-server-dilemma',
+    exits: [],
+    items: [],
     checkpoint: true
   },
 
-  corridor: {
-    id: 'corridor',
-    name: 'PULSING CORRIDOR',
+  flesh_cellar: {
+    id: 'flesh_cellar',
+    name: 'SUB-LEVEL 0 // THE FLESH CELLAR',
+    branch: 'beast',
     narration: [
-      'The walls are no longer drywall. They are wet, twitching tendon.',
-      'You are running now, but your feet make heavy, clicking claw sounds.',
-      'Why is it that every door unlocked just as you reached it?'
+      'The floorboards gave way. You landed knee-deep in cold, stagnant water.',
+      'The air is thick with the copper stench of raw iron and predatory breath.',
+      'Heavy dragging footsteps click in the darkness ahead, blocking the only blast door out.'
+    ],
+    firstPersonDrift: [
+      'I fell into the dark. The water felt warm, like spilled blood.',
+      'I listened for the monster. The growl was coming from my own throat.'
+    ],
+    challengeTemplate: 'bandersnatch',
+    defaultChallengeId: 'bandersnatch-cellar-dilemma',
+    exits: [],
+    items: [],
+    checkpoint: true
+  },
+
+  simulation_core: {
+    id: 'simulation_core',
+    name: 'MAINFRAME // SIMULATION CORE',
+    branch: 'meta',
+    narration: [
+      'You enter a subterranean vault occupied by a monolithic supercomputer terminal.',
+      'The screen displays your exact current session, your hesitation latency, and your live decisions.',
+      'The cursor pulses: "The simulated protagonist has arrived. Execute program termination protocol?"'
+    ],
+    firstPersonDrift: [
+      'The room was vibrating at 60 Hz. The entire reality was just code running in a sandbox.',
+      'I am staring at the terminal prompt that created me.'
+    ],
+    challengeTemplate: 'bandersnatch',
+    defaultChallengeId: 'bandersnatch-sim-dilemma',
+    exits: [],
+    items: [],
+    checkpoint: true
+  },
+
+  pulsing_antechamber: {
+    id: 'pulsing_antechamber',
+    name: 'DEEP VAULT // PULSING ANTECHAMBER',
+    branch: 'beast',
+    narration: [
+      'The corridor walls have transformed into wet, twitching sinew and bone.',
+      'Your heart beats in deafening unison with the room. The human fear is evaporating.',
+      'Ahead lies an antique silver archway. You feel razor fangs pressing through your gums.'
     ],
     firstPersonDrift: [
       'The walls beat in rhythm with my pulse.',
       'I was no longer running from the thing in the dark.',
-      'I was heading home.'
+      'I was heading to the glass to meet my true face.'
     ],
     challengeTemplate: 'bandersnatch',
-    defaultChallengeId: 'fallback-bandersnatch-6',
-    exits: [
-      { direction: 'south', targetRoomId: 'basement' },
-      { direction: 'north', targetRoomId: 'mirror_room', locked: true, lockDescription: 'Make your final breakthrough decision to unseal the mirror vault.' }
-    ],
+    defaultChallengeId: 'bandersnatch-antechamber-dilemma',
+    exits: [],
     items: [],
     checkpoint: true
   },
 
-  mirror_room: {
-    id: 'mirror_room',
-    name: 'THE MIRROR VAULT',
+  mirror_vault: {
+    id: 'mirror_vault',
+    name: 'THRESHOLD // THE MIRROR VAULT',
+    branch: 'root',
     narration: [
-      'A circular chamber paved with polished obsidian.',
-      'In the center stands a floor-to-ceiling mirror framed in silver.',
-      'Type "look mirror" or "approach mirror" to see who made it to the end.'
+      'A vast circular chamber paved with polished obsidian.',
+      'In the center stands a floor-to-ceiling mirror framed in fractured silver.',
+      'Type "look mirror" or click the mirror prompt below to see what reached the end.'
     ],
     firstPersonDrift: [
       'I finally stood before the glass.',
       'There was never anyone behind me.',
-      'I was the only one in the house.'
+      'The reflection is waiting.'
     ],
     exits: [],
     items: [],

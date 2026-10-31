@@ -768,6 +768,73 @@ body.monochrome {
   min-height: 80px;
 }
 
+/* Case Branch Map in Logs View */
+.branch-card {
+  border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.case-branch-map {
+  font-family: var(--font-family);
+  font-size: 14px;
+  line-height: 1.35;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  overflow-x: auto;
+}
+
+.branch-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.branch-node.active {
+  background: rgba(51, 255, 51, 0.18);
+  border-left: 3px solid #33ff33;
+  color: var(--fg-bright);
+  font-weight: bold;
+}
+
+.branch-node.resolved {
+  color: var(--fg-bright);
+  opacity: 0.85;
+}
+
+.branch-node.collapsed {
+  opacity: 0.3;
+  text-decoration: line-through;
+  color: var(--fg-dim);
+}
+
+.branch-node.pending {
+  opacity: 0.45;
+  color: var(--fg-dim);
+}
+
+.branch-status-tag {
+  font-size: 11px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  letter-spacing: 0.05em;
+}
+
+.branch-summary-bar {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px dotted var(--border-color);
+  padding-top: 4px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+
 /* Debug Modal */
 .debug-modal {
   position: fixed;

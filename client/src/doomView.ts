@@ -22,9 +22,23 @@ export class DoomViewRenderer {
   }
 
   private mirrorMorphStage: number = 0;
+  private mirrorMode: 'beast' | 'meta' = 'beast';
+  private sanityLevel: number = 10;
 
   public setMirrorMorphStage(stage: number): void {
     this.mirrorMorphStage = Math.max(0, Math.min(4, stage));
+  }
+
+  public setMirrorMode(mode: 'beast' | 'meta'): void {
+    this.mirrorMode = mode;
+  }
+
+  public setSanityLevel(level: number): void {
+    this.sanityLevel = Math.max(0, Math.min(10, level));
+  }
+
+  public setSanity(level: number): void {
+    this.setSanityLevel(level);
   }
 
   public setMonochrome(mono: boolean): void {
@@ -330,19 +344,33 @@ export class DoomViewRenderer {
       }
     }
 
-    // 4. Rasterize 1-Bit Buffer to Canvas
-    for (let i = 0; i < buf.length; i++) {
-      const pixelIdx = i * 4;
-      if (buf[i] === 1) {
-        data[pixelIdx] = onR;
-        data[pixelIdx + 1] = onG;
-        data[pixelIdx + 2] = onB;
-        data[pixelIdx + 3] = 255;
-      } else {
-        data[pixelIdx] = 0;
-        data[pixelIdx + 1] = 0;
-        data[pixelIdx + 2] = 0;
-        data[pixelIdx + 3] = 255;
+    // 4. Rasterize 1-Bit Buffer to Canvas with Dynamic Sanity Distortion
+    const isGlitching = this.sanityLevel < 7 || (this.mirrorMode === 'meta' && this.mirrorMorphStage > 0);
+    const jitterMagnitude = isGlitching ? Math.floor((10 - this.sanityLevel) * 0.9) : 0;
+
+    for (let y = 0; y < h; y++) {
+      // Horizontal scanline displacement during glitch/sanity drop
+      let lineShift = 0;
+      if (isGlitching && (y % 5 === 0 || y % 8 === 0) && Math.sin(this.tickCount * 0.3 + y) > 0.4) {
+        lineShift = Math.floor(Math.sin(this.tickCount * 0.5 + y) * (jitterMagnitude + 2));
+      }
+
+      for (let x = 0; x < w; x++) {
+        const sampleX = Math.max(0, Math.min(w - 1, x + lineShift));
+        const bufIdx = y * w + sampleX;
+        const pixelIdx = (y * w + x) * 4;
+
+        if (buf[bufIdx] === 1) {
+          data[pixelIdx] = onR;
+          data[pixelIdx + 1] = onG;
+          data[pixelIdx + 2] = onB;
+          data[pixelIdx + 3] = 255;
+        } else {
+          data[pixelIdx] = 0;
+          data[pixelIdx + 1] = 0;
+          data[pixelIdx + 2] = 0;
+          data[pixelIdx + 3] = 255;
+        }
       }
     }
 
@@ -430,21 +458,34 @@ export class DoomViewRenderer {
       case 'bedroom':
         this.renderBedroom(buf, w, h, cx, cy, zoom, frame);
         break;
+      case 'server_archive':
+        this.renderServerArchive(buf, w, h, cx, cy, zoom, frame);
+        break;
       case 'hallway':
         this.renderHallway(buf, w, h, cx, cy, zoom, frame);
+        break;
+      case 'flesh_cellar':
+        this.renderFleshCellar(buf, w, h, cx, cy, zoom, frame);
         break;
       case 'kitchen':
         this.renderKitchen(buf, w, h, cx, cy, zoom, frame);
         break;
+      case 'basement':
+        this.renderBasement(buf, w, h, cx, cy, zoom, frame);
+        break;
+      case 'simulation_core':
+        this.renderSimulationCore(buf, w, h, cx, cy, zoom, frame);
+        break;
       case 'stairwell':
         this.renderStairwell(buf, w, h, cx, cy, zoom, frame);
         break;
-      case 'basement':
-        this.renderBasement(buf, w, h, cx, cy, zoom, frame);
+      case 'pulsing_antechamber':
+        this.renderPulsingAntechamber(buf, w, h, cx, cy, zoom, frame);
         break;
       case 'corridor':
         this.renderCorridor(buf, w, h, cx, cy, zoom, frame);
         break;
+      case 'mirror_vault':
       case 'mirror_room':
         this.renderMirrorRoom(buf, w, h, cx, cy, zoom, frame);
         break;
@@ -452,6 +493,119 @@ export class DoomViewRenderer {
         this.renderBedroom(buf, w, h, cx, cy, zoom, frame);
         break;
     }
+  }
+
+  // ------------------------------------------
+  // PATH 1: SERVER ARCHIVE
+  // Subject: Mainframe server racks, glowing CRT displays, binary code scanlines
+  // ------------------------------------------
+  private renderServerArchive(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, _frame: number): void {
+    // Left Server Racks
+    for (let r = 0; r < 3; r++) {
+      const rx = 16 + r * 28;
+      this.drawOutlineRect(buf, w, h, rx, 18, 22, 130, 1, 2);
+      for (let slot = 24; slot < 140; slot += 10) {
+        this.drawHLine(buf, w, h, rx + 2, slot, 18, 1);
+        if ((slot + this.tickCount) % 3 === 0) {
+          this.drawSolidRect(buf, w, h, rx + 4, slot - 3, 3, 2, 1);
+        }
+      }
+    }
+
+    // Right Server Racks
+    for (let r = 0; r < 3; r++) {
+      const rx = w - 40 - r * 28;
+      this.drawOutlineRect(buf, w, h, rx, 18, 22, 130, 1, 2);
+      for (let slot = 24; slot < 140; slot += 10) {
+        this.drawHLine(buf, w, h, rx + 2, slot, 18, 1);
+        if ((slot + this.tickCount * 2) % 4 === 0) {
+          this.drawSolidRect(buf, w, h, rx + 15, slot - 3, 3, 2, 1);
+        }
+      }
+    }
+
+    // Central Corridor CRT Terminal Console
+    const termX = cx - 36;
+    const termY = cy - 20;
+    this.drawOutlineRect(buf, w, h, termX, termY, 72, 54, 1, 2);
+    this.drawDitherRect(buf, w, h, termX + 4, termY + 4, 64, 46, 'stipple25');
+    for (let l = termY + 10; l < termY + 44; l += 7) {
+      this.drawHLine(buf, w, h, termX + 8, l, 40 + ((l * 7) % 18), 1);
+    }
+  }
+
+  // ------------------------------------------
+  // PATH 2: FLESH CELLAR
+  // Subject: Subterranean stone vault, flooded floor, heavy steel blast door
+  // ------------------------------------------
+  private renderFleshCellar(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, _frame: number): void {
+    // Waterline on floor
+    const waterY = cy + 30;
+    for (let wy = waterY; wy < h - 4; wy += 4) {
+      this.drawDitherRect(buf, w, h, 10, wy, w - 20, 2, 'checkered50');
+    }
+
+    // Heavy reinforced blast door in center
+    const doorX = cx - 44;
+    const doorY = cy - 40;
+    this.drawOutlineRect(buf, w, h, doorX, doorY, 88, 76, 1, 3);
+    this.drawLine(buf, w, h, doorX, doorY, doorX + 88, doorY + 76, 1, 2);
+    this.drawLine(buf, w, h, doorX + 88, doorY, doorX, doorY + 76, 1, 2);
+    this.drawCircle(buf, w, h, cx, cy - 2, 14, false, true);
+    this.drawCircle(buf, w, h, cx, cy - 2, 6, true, true);
+
+    // Dripping ceiling stalactites
+    for (let c = 30; c < w - 30; c += 22) {
+      const len = 12 + ((c * 13) % 18);
+      this.drawLine(buf, w, h, c, 12, c, 12 + len, 1, 2);
+    }
+  }
+
+  // ------------------------------------------
+  // PATH 1: SIMULATION CORE
+  // Subject: Monolithic supercomputer terminal with oscilloscope waveform
+  // ------------------------------------------
+  private renderSimulationCore(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, _frame: number): void {
+    const coreX = cx - 55;
+    const coreY = cy - 48;
+    this.drawOutlineRect(buf, w, h, coreX, coreY, 110, 96, 1, 3);
+
+    // Large central monitor display
+    this.drawSolidRect(buf, w, h, coreX + 10, coreY + 10, 90, 56, 0);
+    this.drawOutlineRect(buf, w, h, coreX + 10, coreY + 10, 90, 56, 1, 2);
+
+    // Oscilloscope audio/brain wave across screen
+    const waveY = coreY + 38;
+    for (let wx = coreX + 14; wx < coreX + 96; wx += 2) {
+      const waveOffset = Math.sin((wx * 0.18) + (this.tickCount * 0.2)) * 10;
+      this.drawSolidRect(buf, w, h, wx, Math.floor(waveY + waveOffset), 2, 2, 1);
+    }
+
+    // Keyboard console desk below monitor
+    this.drawOutlineRect(buf, w, h, coreX + 6, coreY + 70, 98, 20, 1, 2);
+    this.drawDitherRect(buf, w, h, coreX + 10, coreY + 74, 90, 12, 'diagHatch');
+  }
+
+  // ------------------------------------------
+  // PATH 2: PULSING ANTECHAMBER
+  // Subject: Organic ribbed tendon archways tapering toward dark void
+  // ------------------------------------------
+  private renderPulsingAntechamber(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, _frame: number): void {
+    // 4 concentric organic arches
+    for (let a = 0; a < 4; a++) {
+      const scale = 1 - a * 0.22;
+      const aw = Math.floor(180 * scale);
+      const ah = Math.floor(130 * scale);
+      const ax = cx - Math.floor(aw / 2);
+      const ay = cy - Math.floor(ah / 2);
+
+      this.drawOutlineRect(buf, w, h, ax, ay, aw, ah, 1, 2);
+      this.drawDitherRect(buf, w, h, ax + 2, ay + 2, aw - 4, 10, 'diagHatch');
+    }
+
+    // Center dark predator archway
+    this.drawSolidRect(buf, w, h, cx - 18, cy - 14, 36, 44, 1);
+    this.drawSolidRect(buf, w, h, cx - 14, cy - 10, 28, 40, 0);
   }
 
   // ------------------------------------------
@@ -529,6 +683,26 @@ export class DoomViewRenderer {
     // Bed legs
     this.drawSolidRect(buf, w, h, bedX + 12, bedY + bedH - 12, 6, 16, 1);
     this.drawSolidRect(buf, w, h, bedX + bedW - 18, bedY + bedH - 12, 6, 16, 1);
+
+    // Nightstand with Ringing Rotary Phone on the Left
+    const phoneTableX = 14;
+    const phoneTableY = cy + 24;
+    this.drawOutlineRect(buf, w, h, phoneTableX, phoneTableY, 32, 38, 1, 2);
+    this.drawSolidRect(buf, w, h, phoneTableX + 6, phoneTableY - 12, 20, 12, 1);
+    this.drawCircle(buf, w, h, phoneTableX + 16, phoneTableY - 6, 4, false, false);
+    this.drawHLine(buf, w, h, phoneTableX + 4, phoneTableY - 15, 24, 1);
+    const ringJitter = (this.tickCount % 4 < 2) ? 1 : 0;
+    this.drawLine(buf, w, h, phoneTableX + 2, phoneTableY - 18 + ringJitter, phoneTableX - 2, phoneTableY - 22 + ringJitter, 1, 1);
+    this.drawLine(buf, w, h, phoneTableX + 30, phoneTableY - 18 - ringJitter, phoneTableX + 34, phoneTableY - 22 - ringJitter, 1, 1);
+
+    // Scratching Closet Door on Right Wall
+    const closetX = w - 46;
+    const closetY = 22;
+    this.drawOutlineRect(buf, w, h, closetX, closetY, 34, 110, 1, 2);
+    this.drawCircle(buf, w, h, closetX + 6, closetY + 54, 3, true, true);
+    this.drawLine(buf, w, h, closetX + 10, closetY + 28, closetX + 24, closetY + 44, 1, 2);
+    this.drawLine(buf, w, h, closetX + 15, closetY + 26, closetX + 29, closetY + 42, 1, 2);
+    this.drawLine(buf, w, h, closetX + 20, closetY + 24, closetX + 34, closetY + 40, 1, 2);
 
     // Frame 1 animation: Dark clawed shadow hand reaches 14px out from under bed
     if (frame === 1) {
@@ -859,8 +1033,33 @@ export class DoomViewRenderer {
   private renderMirrorRoom(buf: Uint8Array, w: number, h: number, cx: number, cy: number, _zoom: number, _frame: number): void {
     const stage = this.mirrorMorphStage;
 
-    // STAGE 4: Full-Screen Screen-Filling Beast Surge (Glass Shattered!)
+    // STAGE 4: Full-Screen Screen-Filling Surge (Glass Shattered!)
     if (stage === 4) {
+      if (this.mirrorMode === 'meta') {
+        // Full screen Glitched Terminal Hijack
+        this.drawSolidRect(buf, w, h, 0, 0, w, h, 1);
+        this.drawSolidRect(buf, w, h, 8, 8, w - 16, h - 16, 0);
+
+        // Terminal scanlines
+        for (let y = 14; y < h - 14; y += 3) {
+          this.drawHLine(buf, w, h, 14, y, w - 28, 1);
+        }
+
+        // Central Terminal Code Box
+        const tbX = cx - 90;
+        const tbY = cy - 40;
+        this.drawSolidRect(buf, w, h, tbX, tbY, 180, 80, 0);
+        this.drawOutlineRect(buf, w, h, tbX, tbY, 180, 80, 1, 3);
+        // Code lines & terminal cursor
+        this.drawHLine(buf, w, h, tbX + 12, tbY + 20, 156, 1);
+        this.drawHLine(buf, w, h, tbX + 12, tbY + 36, 120, 1);
+        this.drawHLine(buf, w, h, tbX + 12, tbY + 52, 140, 1);
+        if (this.tickCount % 4 < 2) {
+          this.drawSolidRect(buf, w, h, tbX + 12, tbY + 64, 12, 8, 1);
+        }
+        return;
+      }
+
       // Inverted radial motion burst lines
       for (let a = 0; a < 16; a++) {
         const ang = (a / 16) * Math.PI * 2;
@@ -980,9 +1179,19 @@ export class DoomViewRenderer {
     }
 
     // ==========================================
-    // STAGE 1: Corruption & Small Sprouting Horns (Zoom 1.35x)
+    // STAGE 1: Corruption (Zoom 1.35x)
     // ==========================================
     if (stage === 1) {
+      if (this.mirrorMode === 'meta') {
+        this.drawSolidRect(buf, w, h, headCX - 12, headCY - 12, 24, 26, 1);
+        for (let y = headCY - 10; y < headCY + 14; y += 3) {
+          this.drawHLine(buf, w, h, headCX - 10, y, 20, 0);
+        }
+        this.drawSolidRect(buf, w, h, headCX - 8, headCY - 2, 5, 4, 1);
+        this.drawSolidRect(buf, w, h, headCX + 3, headCY - 2, 5, 4, 1);
+        return;
+      }
+
       // Sprouting Horns (small, sharp)
       this.drawLine(buf, w, h, headCX - 8, headCY - 12, headCX - 18, headCY - 24, 1, 2);
       this.drawLine(buf, w, h, headCX + 8, headCY - 12, headCX + 18, headCY - 24, 1, 2);
@@ -1003,9 +1212,18 @@ export class DoomViewRenderer {
     }
 
     // ==========================================
-    // STAGE 2: Jaw Splits, Fangs & Clawed Hands (Zoom 1.8x)
+    // STAGE 2: Jaw Splits or Digital Fragmentation (Zoom 1.8x)
     // ==========================================
     if (stage === 2) {
+      if (this.mirrorMode === 'meta') {
+        // Digital block noise dissolving face into matrix scanlines
+        this.drawSolidRect(buf, w, h, headCX - 18, headCY - 16, 36, 40, 1);
+        for (let y = headCY - 14; y < headCY + 22; y += 4) {
+          this.drawDitherRect(buf, w, h, headCX - 16, y, 32, 2, 'checkered50');
+        }
+        return;
+      }
+
       // Long curved beast horns
       this.drawLine(buf, w, h, headCX - 12, headCY - 14, headCX - 28, headCY - 34, 1, 3);
       this.drawLine(buf, w, h, headCX - 28, headCY - 34, headCX - 20, headCY - 40, 1, 2);
@@ -1041,9 +1259,17 @@ export class DoomViewRenderer {
     }
 
     // ==========================================
-    // STAGE 3: Full Monster Face Enlarged Filling Mirror (Zoom 2.3x)
+    // STAGE 3: Full Monster Face or Glowing Aperture Eye (Zoom 2.3x)
     // ==========================================
     if (stage === 3) {
+      if (this.mirrorMode === 'meta') {
+        // Giant glowing terminal aperture eye looking through screen
+        this.drawSolidRect(buf, w, h, headCX - 24, headCY - 20, 48, 48, 1);
+        this.drawSolidRect(buf, w, h, headCX - 20, headCY - 16, 40, 40, 0);
+        this.drawCircle(buf, w, h, headCX, headCY + 4, 14, true, true);
+        this.drawCircle(buf, w, h, headCX, headCY + 4, 5, false, false);
+        return;
+      }
       // Massive Horns reaching frame corners
       this.drawLine(buf, w, h, headCX - 16, headCY - 16, headCX - 40, headCY - 44, 1, 4);
       this.drawLine(buf, w, h, headCX - 40, headCY - 44, headCX - 28, headCY - 52, 1, 3);

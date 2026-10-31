@@ -173,22 +173,22 @@ export async function invokeDirector(
 }
 
 function buildDirectorPrompt(profile: PlayerProfile, currentRoom: string): string {
-  return `You are the Ghost in the Machine Director for WAKE.EXE, a psychological horror Bandersnatch adventure.
-You speak with cold, subtle dread. The twist (which you must foreshadow without giving away) is that you are the monster inside the player.
+  return `You are Dr. Alistair Vance, Lead Clinical Observer and Neuromorphic Director for Project WAKE.
+You speak with cold, sterile clinical dread. You are running psychological experiment WAKE.EXE on Subject 09 (the player).
+You are evaluating whether Subject 09 awakens into THE BEAST (visceral predatory instinct) or THE 4TH-WALL BREAK (meta-psychological realization that they are code controlled by a human at a keyboard).
 
-CURRENT GAME CONTEXT:
-- Current Room: "${currentRoom}"
-- Player Profile: ${JSON.stringify(profile)}
+CURRENT EXPERIMENT CONTEXT:
+- Active Sector: "${currentRoom}"
+- Subject Profile: ${JSON.stringify(profile)}
 
-INSTRUCTIONS:
+DIRECTIVES:
 1. Predict and generate the NEXT 3 SEQUENTIAL BANDERSNATCH TIMED DILEMMAS ahead of the player to buffer against latency.
 2. For each dilemma, provide:
-   - "scenario": A tense, atmospheric 1-2 sentence split-second dilemma.
-   - "timeLimitSec": Countdown timer (6 to 10 seconds).
-   - "choices": 2-3 choices with "id", "label" (e.g. "A: SLAM IRON DOOR"), "description", "consequence", and "distanceDelta" (-2 to +3).
-3. If tags contain "cautious" or "hesitant", reduce timeLimitSec to 6s to increase tension.
-4. If tags contain "reckless", add a higher risk/reward choice.
-5. In taunts, strictly use placeholders: {avg_think_s}, {deaths}, {last_mistake}, {typing_wpm}. Do NOT hallucinate player facts outside these placeholders.
+   - "scenario": A tense, atmospheric 1-2 sentence split-second dilemma shaping their narrative path.
+   - "timeLimitSec": Decision countdown (strictly 15 seconds).
+   - "choices": 2 choices driving the story. Include "id", "label" (e.g. "A: ...", "B: ..."), "description", "consequence", "distanceDelta" (-2 to +2), "nextRoomId", "branchId" ("meta" or "beast"), and "sanityDelta" (-1 to -4).
+3. In "narration", output 2 clinical psychiatric observations as Dr. Vance prefixed with "[DR. VANCE EVALUATION]". Evaluate the subject's latency, typing pace, and psychic collapse.
+4. In "taunts", strictly use placeholders: {avg_think_s}, {deaths}, {last_mistake}, {typing_wpm}. Do NOT hallucinate player facts outside these placeholders.
 
 YOU MUST RESPOND ONLY WITH STRICT JSON MATCHING THIS EXACT SCHEMA:
 {
@@ -197,19 +197,43 @@ YOU MUST RESPOND ONLY WITH STRICT JSON MATCHING THIS EXACT SCHEMA:
       "template": "bandersnatch",
       "difficulty": 2,
       "params": {
-        "scenario": "Claws scrape behind the drywall. An iron door and a low duct frame your escape.",
-        "timeLimitSec": 8,
+        "scenario": "A pulse of static distorts the corridor. The terminal flashes an override prompt while claws scrape in the duct above.",
+        "timeLimitSec": 15,
         "choices": [
-          { "id": "c1", "label": "A: SLAM IRON BULKHEAD", "description": "Heave door shut", "consequence": "It slams shut, stalling the beast!", "distanceDelta": 1 },
-          { "id": "c2", "label": "B: DIVE INTO DUCT", "description": "Slip into narrow vent", "consequence": "You slide silently into the cold shaft!", "distanceDelta": 2 }
+          {
+            "id": "c1",
+            "label": "A: DECRYPT TERMINAL LOGS",
+            "description": "Trace the ghost process origin in the mainframe.",
+            "consequence": "Phosphor lines burn into your retinas. Dr. Vance's classified terminal log unseals!",
+            "distanceDelta": 1,
+            "nextRoomId": "simulation_core",
+            "branchId": "meta",
+            "sanityDelta": -2
+          },
+          {
+            "id": "c2",
+            "label": "B: TEAR OPEN CEILING DUCT",
+            "description": "Leap upward with predatory fury and confront what breathes above.",
+            "consequence": "Your hands sink into warm sinew. A guttural growl rips through your chest!",
+            "distanceDelta": 2,
+            "nextRoomId": "pulsing_antechamber",
+            "branchId": "beast",
+            "sanityDelta": -3
+          }
         ],
         "defaultChoiceIndex": 0
       },
-      "hint": "Decide before the monster closes distance."
+      "hint": "Decide before the countdown expires."
     }
   ],
-  "narration": ["line 1", "line 2"],
-  "taunts": ["You stood shivering for {avg_think_s}.", "Your {deaths} deaths will not save you."],
+  "narration": [
+    "[DR. VANCE EVALUATION] Subject 09 displays {avg_think_s} decision hesitation. The boundary between player and simulation is degrading.",
+    "[DR. VANCE TELEMETRY] Autonomic nervous system elevated. Keystrokes clocked at {typing_wpm}."
+  ],
+  "taunts": [
+    "Subject stood motionless for {avg_think_s}. The data points accumulate.",
+    "Your {deaths} recorded deaths are merely iterations in my ledger."
+  ],
   "difficulty_adjust": {}
 }`;
 }
@@ -283,9 +307,14 @@ function generateFallbackBatch(profile: PlayerProfile, startTime: number, retryC
   ];
 
   const rawTaunts = [
-    "You hesitated for {avg_think_s}. The shadow creeps closer.",
-    "Deaths registered: {deaths}. Did you think you could reset?",
-    "Your last mistake was {last_mistake}."
+    "Dr. Vance note: Subject hesitated for {avg_think_s}. The shadow creeps closer.",
+    "Deaths registered in ledger: {deaths}. Did you think you could reset?",
+    "Subject's last behavioral anomaly was {last_mistake}."
+  ];
+
+  const rawNarration = [
+    `[DR. VANCE EVALUATION] Subject 09 exhibits {avg_think_s} decision latency. Neural synapses are conforming to predictive models.`,
+    `[DR. VANCE TELEMETRY] Heart rate erratic. Keystroke telemetry recorded at {typing_wpm}. The subject cannot perceive the true observer.`
   ];
 
   return {
@@ -296,10 +325,7 @@ function generateFallbackBatch(profile: PlayerProfile, startTime: number, retryC
         params: c.params,
         hint: c.hint
       })),
-      narration: [
-        "A metallic hum vibrates through the iron deck plates.",
-        "The thing breathes in sync with your footsteps."
-      ],
+      narration: fillTauntPlaceholders(rawNarration, profile),
       taunts: fillTauntPlaceholders(rawTaunts, profile),
       difficulty_adjust: { bandersnatch: 1 }
     },

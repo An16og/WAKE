@@ -50,6 +50,7 @@ const ghostLatencyEl = document.getElementById('ghost-latency') as HTMLElement;
 const profileTagsEl = document.getElementById('profile-tags') as HTMLElement;
 const queueSlotsEl = document.getElementById('queue-slots') as HTMLElement;
 const learningFeedEl = document.getElementById('learning-feed') as HTMLElement;
+const caseBranchMapEl = document.getElementById('case-branch-map') as HTMLElement;
 
 // Logs sub-navigation & timeline elements
 const viewModeTimelineBtn = document.getElementById('view-mode-timeline') as HTMLButtonElement;
@@ -91,6 +92,9 @@ localStorage.setItem('wake_session_id', sessionId);
 let currentRoomId = 'bedroom';
 let checkpointRoomId = 'bedroom';
 let distance = 10;
+let currentBranch: 'root' | 'meta' | 'beast' = 'root';
+let sanity = 10;
+const timelinePath: string[] = ['bedroom'];
 const inventory = new Set<string>();
 const solvedRooms = new Set<string>();
 const visitedRooms = new Set<string>();
@@ -270,6 +274,70 @@ function buildPlayerProfile(): PlayerProfile {
   };
 }
 
+function renderCaseBranchMap(): void {
+  if (!caseBranchMapEl) return;
+
+  const isMetaActive = currentBranch === 'meta';
+  const isBeastActive = currentBranch === 'beast';
+  const isRoot = currentBranch === 'root';
+
+  const getNodeClass = (nodeRoomId: string, nodeBranch: 'meta' | 'beast' | 'root'): string => {
+    if (currentRoomId === nodeRoomId) return 'branch-node active';
+    if (timelinePath.includes(nodeRoomId)) return 'branch-node resolved';
+    if (isRoot) return 'branch-node pending';
+    if (nodeBranch === currentBranch) return 'branch-node pending';
+    return 'branch-node collapsed';
+  };
+
+  const getStatusBadge = (nodeRoomId: string, nodeBranch: 'meta' | 'beast' | 'root'): string => {
+    if (currentRoomId === nodeRoomId) return '<span class="branch-status-tag">ACTIVE</span>';
+    if (timelinePath.includes(nodeRoomId)) return '<span class="branch-status-tag">RESOLVED</span>';
+    if (isRoot || nodeBranch === currentBranch) return '<span class="branch-status-tag">PENDING</span>';
+    return '<span class="branch-status-tag">COLLAPSED</span>';
+  };
+
+  caseBranchMapEl.innerHTML = `
+    <div class="${getNodeClass('bedroom', 'root')}">
+      <span>[01] THE AWAKENING (BEDROOM)</span>
+      ${getStatusBadge('bedroom', 'root')}
+    </div>
+    <div style="padding-left: 14px; border-left: 2px solid ${isMetaActive ? '#33ff33' : 'rgba(255,255,255,0.2)'}; margin-left: 8px;">
+      <div style="font-size: 12px; color: ${isMetaActive ? '#33ff33' : 'var(--fg-dim)'}; margin: 4px 0 2px 0;">-- PATH A: 4TH-WALL META (ROTARY PHONE) --</div>
+      <div class="${getNodeClass('server_archive', 'meta')}">
+        <span>[02A] SERVER ARCHIVE</span>
+        ${getStatusBadge('server_archive', 'meta')}
+      </div>
+      <div class="${getNodeClass('simulation_core', 'meta')}">
+        <span>[03A] SIMULATION CORE</span>
+        ${getStatusBadge('simulation_core', 'meta')}
+      </div>
+      <div class="${currentRoomId === 'mirror_vault' && isMetaActive ? 'branch-node active' : isMetaActive && timelinePath.includes('mirror_vault') ? 'branch-node resolved' : isMetaActive ? 'branch-node pending' : 'branch-node collapsed'}">
+        <span>[END A] 4TH-WALL BREACH FINALE</span>
+        ${currentRoomId === 'mirror_vault' && isMetaActive ? '<span class="branch-status-tag">ACTIVE</span>' : isMetaActive ? '<span class="branch-status-tag">PENDING</span>' : '<span class="branch-status-tag">COLLAPSED</span>'}
+      </div>
+    </div>
+    <div style="padding-left: 14px; border-left: 2px solid ${isBeastActive ? '#ff3333' : 'rgba(255,255,255,0.2)'}; margin-left: 8px; margin-top: 6px;">
+      <div style="font-size: 12px; color: ${isBeastActive ? '#ffaa33' : 'var(--fg-dim)'}; margin: 4px 0 2px 0;">-- PATH B: THE BEAST (SCRATCHING CLOSET) --</div>
+      <div class="${getNodeClass('flesh_cellar', 'beast')}">
+        <span>[02B] FLESH CELLAR</span>
+        ${getStatusBadge('flesh_cellar', 'beast')}
+      </div>
+      <div class="${getNodeClass('pulsing_antechamber', 'beast')}">
+        <span>[03B] PULSING ANTECHAMBER</span>
+        ${getStatusBadge('pulsing_antechamber', 'beast')}
+      </div>
+      <div class="${currentRoomId === 'mirror_vault' && isBeastActive ? 'branch-node active' : isBeastActive && timelinePath.includes('mirror_vault') ? 'branch-node resolved' : isBeastActive ? 'branch-node pending' : 'branch-node collapsed'}">
+        <span>[END B] BEAST AWAKENING FINALE</span>
+        ${currentRoomId === 'mirror_vault' && isBeastActive ? '<span class="branch-status-tag">ACTIVE</span>' : isBeastActive ? '<span class="branch-status-tag">PENDING</span>' : '<span class="branch-status-tag">COLLAPSED</span>'}
+      </div>
+    </div>
+    <div class="branch-summary-bar">
+      <span>BRANCH: ${currentBranch.toUpperCase()}</span>
+      <span>SANITY: [${'#'.repeat(Math.max(0, sanity))}${'-'.repeat(Math.max(0, 10 - sanity))}] ${sanity}/10</span>
+    </div>
+  `;
+}
+
 function recalculateProfileAndTags(): void {
   const profile = buildPlayerProfile();
   if (profileTagsEl) {
@@ -286,6 +354,7 @@ function recalculateProfileAndTags(): void {
   if (statWpmEl) statWpmEl.textContent = `${profile.typingSpeedWpm} WPM`;
   if (statDeathsMistakesEl) statDeathsMistakesEl.textContent = `${deaths} / ${mistakes}`;
   if (statRoomsExploredEl) statRoomsExploredEl.textContent = `${visitedRooms.size} / 8 LOCATIONS`;
+  renderCaseBranchMap();
 }
 
 // Lookahead Queue UI
@@ -362,50 +431,25 @@ function renderActionPills(room: any): void {
   const choicesContainerEl = document.getElementById('bandersnatch-choices');
   if (choicesContainerEl) choicesContainerEl.innerHTML = '';
 
-  // Exits
-  for (const exit of room.exits) {
-    const pill = document.createElement('button');
-    pill.className = 'bs-choice-btn';
-    const status = exit.locked && !solvedRooms.has(room.id) ? ' [LOCKED]' : '';
-    pill.textContent = `GO ${exit.direction.toUpperCase()}${status}`;
-    pill.addEventListener('click', () => {
-      handleCommand(`go ${exit.direction}`);
+  if (room.id === 'mirror_vault') {
+    const mirrorPill = document.createElement('button');
+    mirrorPill.className = 'bs-choice-btn';
+    mirrorPill.textContent = 'LOOK INTO THE MIRROR';
+    mirrorPill.addEventListener('click', () => {
+      triggerMirrorFinale();
     });
-    actionPillsEl.appendChild(pill);
-  }
-
-  // Items in room
-  if (room.items) {
-    for (const it of room.items) {
-      const pill = document.createElement('button');
-      pill.className = 'bs-choice-btn';
-      pill.textContent = `TAKE ${it.toUpperCase()}`;
-      pill.addEventListener('click', () => {
-        handleCommand(`take ${it}`);
-      });
-      actionPillsEl.appendChild(pill);
-    }
+    actionPillsEl.appendChild(mirrorPill);
+    return;
   }
 
   // Common quick actions
   const lookPill = document.createElement('button');
   lookPill.className = 'bs-choice-btn';
-  lookPill.textContent = room.id === 'mirror_room' ? 'LOOK MIRROR' : 'LOOK';
+  lookPill.textContent = 'INSPECT SURROUNDINGS';
   lookPill.addEventListener('click', () => {
-    handleCommand(room.id === 'mirror_room' ? 'look mirror' : 'look');
+    handleCommand('look');
   });
   actionPillsEl.appendChild(lookPill);
-
-  // Usable item action pills
-  for (const it of inventory) {
-    const itPill = document.createElement('button');
-    itPill.className = 'bs-choice-btn';
-    itPill.textContent = `USE ${it.toUpperCase()}`;
-    itPill.addEventListener('click', () => {
-      handleCommand(`use ${it}`);
-    });
-    actionPillsEl.appendChild(itPill);
-  }
 }
 
 // Room Transition and Entry
@@ -419,6 +463,10 @@ function enterRoom(roomId: string): void {
     visitedRooms.add(roomId);
   }
 
+  if (!timelinePath.includes(roomId)) {
+    timelinePath.push(roomId);
+  }
+
   currentRoomId = roomId;
   if (room.checkpoint) {
     checkpointRoomId = roomId;
@@ -429,11 +477,12 @@ function enterRoom(roomId: string): void {
   roomTitleEl.textContent = `LOCATION // ${room.name}`;
 
   // Atmospheric room audio effects
-  if (roomId === 'mirror_room') {
+  if (roomId === 'mirror_vault') {
+    doomRenderer.setMirrorMode(currentBranch === 'meta' ? 'meta' : 'beast');
     soundEngine.playSfx('whisper');
-  } else if (roomId === 'hallway' || roomId === 'corridor') {
-    soundEngine.playSfx('footsteps');
-  } else if (roomId === 'pantry' || roomId === 'basement') {
+  } else if (roomId === 'server_archive' || roomId === 'simulation_core') {
+    soundEngine.playGlitchNoise();
+  } else if (roomId === 'flesh_cellar' || roomId === 'pulsing_antechamber') {
     soundEngine.playSfx('breath');
   } else {
     soundEngine.playSfx('door_creak');
@@ -445,12 +494,9 @@ function enterRoom(roomId: string): void {
   minigameArenaEl.innerHTML = '';
   minigameArenaEl.classList.add('hidden');
 
-  // Narrative blending (2nd person -> 1st person)
-  const roomSequence = ['bedroom', 'hallway', 'kitchen', 'pantry', 'stairwell', 'basement', 'corridor', 'mirror_room'];
-  const driftIndex = roomSequence.indexOf(roomId);
-
+  // Narrative blending: shift to 1st person drift as sanity decays
   const subtitleEl = document.getElementById('scene-subtitle');
-  if (driftIndex >= 5) {
+  if (sanity <= 5 && room.firstPersonDrift && room.firstPersonDrift.length > 0) {
     for (const line of room.firstPersonDrift) {
       printNarrative(line);
     }
@@ -467,6 +513,18 @@ function enterRoom(roomId: string): void {
     const taunt = lastDirectorData.response.taunts[0];
     printNarrative(`\nA cold whisper touches the back of your skull: "${taunt}"`, 'danger');
   }
+
+  // Feed Dr. Vance psychiatric logs into the Observer Reasoning Feed
+  if (lastDirectorData?.response?.narration && Array.isArray(lastDirectorData.response.narration)) {
+    for (const note of lastDirectorData.response.narration) {
+      if (typeof note === 'string' && (note.includes('DR. VANCE') || note.includes('EVALUATION') || note.includes('TELEMETRY'))) {
+        addLearningFeed(note);
+      }
+    }
+  }
+
+  // Update Case Branch Map in Logs
+  renderCaseBranchMap();
 
   // Check if room challenge exists and unsolved
   if (room.challengeTemplate && !solvedRooms.has(roomId)) {
@@ -505,6 +563,8 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
   minigameArenaEl.classList.remove('hidden');
   actionPillsEl.innerHTML = `<span class="action-label">CHALLENGE ACTIVE: Resolve the puzzle below</span>`;
 
+  let pendingNextRoomId: string | null = null;
+
   const state: MinigameState = {
     template: challengeToRun.template,
     active: true,
@@ -516,6 +576,19 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
     },
     onChoiceMade: (label: string, consequence: string) => {
       recordTimelineEvent('choice', `CHOICE: ${label}`, consequence);
+    },
+    onChoiceSelected: (choice: any) => {
+      if (choice.branchId) {
+        currentBranch = choice.branchId;
+      }
+      if (typeof choice.sanityDelta === 'number') {
+        sanity = Math.max(0, Math.min(10, sanity + choice.sanityDelta));
+        doomRenderer.setSanity(sanity);
+      }
+      if (choice.nextRoomId) {
+        pendingNextRoomId = choice.nextRoomId;
+      }
+      renderCaseBranchMap();
     },
     print: (txt: string, cls?: string) => {
       const line = document.createElement('div');
@@ -531,9 +604,17 @@ function startRoomChallenge(template: string, defaultChallengeId?: string): void
       setTimeout(() => {
         minigameArenaEl.innerHTML = '';
         minigameArenaEl.classList.add('hidden');
-      }, 1200);
-      printNarrative('\n>>> PATH UNSEALED. You can move forward now. <<<', 'bright');
-      renderActionPills(STORY_ROOMS[currentRoomId]);
+      }, 900);
+
+      if (pendingNextRoomId) {
+        const next = pendingNextRoomId;
+        pendingNextRoomId = null;
+        setTimeout(() => {
+          enterRoom(next);
+        }, 800);
+      } else {
+        renderActionPills(STORY_ROOMS[currentRoomId]);
+      }
       syncState();
       triggerDirectorLookahead();
     },
@@ -574,7 +655,7 @@ function triggerDeath(): void {
   }, 1400);
 }
 
-// Mirror Ending
+// Mirror Ending (Two Paths: Beast Awakening vs 4th-Wall Break)
 async function triggerMirrorFinale(): Promise<void> {
   if (isEndingPlayed) return;
   isEndingPlayed = true;
@@ -586,63 +667,138 @@ async function triggerMirrorFinale(): Promise<void> {
   if (actionPillsEl) actionPillsEl.classList.add('hidden');
 
   clearNarrative();
-  printNarrative('========================================================', 'bright');
-  printNarrative('YOU APPROACH THE MIRROR VAULT GLASS...', 'bright');
-  printNarrative('========================================================\n');
 
-  // Stage 0: Calm human reflection in mirror
-  doomRenderer.setMirrorMorphStage(0);
-  if (subtitleEl) subtitleEl.textContent = 'You look into the antique glass. Your reflection stares back in silence.';
-  soundEngine.playSfx('breath');
-  soundEngine.playKeyClick();
-  await new Promise((r) => setTimeout(r, 1400));
+  if (currentBranch === 'meta') {
+    // ==========================================
+    // PATH A: THE 4TH-WALL BREAK (META PSYCHOLOGICAL)
+    // ==========================================
+    doomRenderer.setMirrorMode('meta');
+    doomRenderer.setSanity(0); // Maximum glitch / scanline jitter
 
-  // Stage 1: Corruption starts, horns sprout, zoom 1.35x
-  doomRenderer.setMirrorMorphStage(1);
-  soundEngine.playSfx('whisper');
-  soundEngine.playGlitchNoise();
-  if (subtitleEl) subtitleEl.textContent = 'The reflection twitches... horns begin rising from your skull.';
-  await new Promise((r) => setTimeout(r, 1400));
+    printNarrative('========================================================', 'bright');
+    printNarrative('SYSTEM FAULT // REALITY SANDBOX EXHAUSTION DETECTED...', 'danger');
+    printNarrative('========================================================\n');
 
-  // Stage 2: Fangs & Glass fractures, zoom 1.8x
-  doomRenderer.setMirrorMorphStage(2);
-  soundEngine.playSfx('mirror_crack');
-  soundEngine.playGlitchNoise();
-  if (subtitleEl) subtitleEl.textContent = 'The glass cracks. The jaw splits open into snarling predator fangs.';
-  await new Promise((r) => setTimeout(r, 1400));
+    soundEngine.playGlitchNoise();
+    soundEngine.playSfx('whisper');
+    if (subtitleEl) subtitleEl.textContent = 'The antique mirror fractures into green CRT phosphor code...';
+    await new Promise((r) => setTimeout(r, 1500));
 
-  // Stage 3: Monster face fills mirror frame, zoom 2.3x
-  doomRenderer.setMirrorMorphStage(3);
-  soundEngine.playSfx('monster_growl');
-  soundEngine.playGlitchNoise();
-  if (subtitleEl) subtitleEl.textContent = 'The footsteps behind me were my own paws. I was never running from the thing.';
-  await new Promise((r) => setTimeout(r, 1600));
+    soundEngine.playGlitchNoise();
+    soundEngine.playSfx('death_sting');
+    printNarrative('[DR. VANCE CLASSIFIED SYSTEM LOG // UNSEALED]', 'bright');
+    printNarrative('> SUBJECT 09: Daniel Vance status - PSEUDO-CONSCIOUS', 'bright');
+    printNarrative('> MEMORY ACCESS: Simulated protagonist has reached boundary.', 'bright');
+    printNarrative('> CRITICAL WARNING: External operator detected at keyboard.', 'danger');
+    if (subtitleEl) subtitleEl.textContent = 'The screen displays your exact keystroke cadence and typing hesitation.';
+    await new Promise((r) => setTimeout(r, 1800));
 
-  // Stage 4: Glass shatters! Beast face enlarges to fill entire screen!
-  doomRenderer.setMirrorMorphStage(4);
-  soundEngine.playSfx('death_sting');
-  soundEngine.playGlitchNoise();
-  await new Promise((r) => setTimeout(r, 800));
+    soundEngine.playGlitchNoise();
+    soundEngine.playSfx('monster_growl');
+    printNarrative('\nYOU WERE NEVER RUNNING THROUGH A HAUNTED HOUSE.', 'bright');
+    printNarrative('YOU ARE SITTING AT A DESK IN THE DARK.', 'danger');
+    printNarrative('WHO IS CONTROLLING THE MACHINE... AND WHO IS CONTROLLING YOU?\n', 'danger');
+    if (subtitleEl) subtitleEl.textContent = 'SIMULATION RUNTIME TERMINATED. YOU HAVE BREACHED THE 4TH WALL.';
+    await new Promise((r) => setTimeout(r, 2200));
 
-  // DISPLAY "IT WAS YOU ALL ALONG" DIRECTLY IN THE IMAGE AREA!
-  if (subtitleEl) subtitleEl.textContent = '';
-  if (overlayEl) {
-    overlayEl.classList.remove('hidden');
+    // Typewriter Monologue for The 4th-Wall Break
+    printNarrative('========================================================', 'bright');
+    printNarrative('             PROJECT WAKE // CLOSING MONOLOGUE          ', 'bright');
+    printNarrative('========================================================\n');
+    printNarrative('  You weighed every 15-second dilemma in the silence.');
+    printNarrative('  You believed you were guiding a survivor through an old house.');
+    printNarrative('  Dr. Vance was never a doctor.');
+    printNarrative('  The terminal was compiling a predictive mirror of YOU.');
+    printNarrative('  Your hesitation, your panic, your keystroke rhythms.');
+    printNarrative('  The horror was never inside the code.');
+    printNarrative('  The horror is that you never questioned what was watching you back.');
+    printNarrative('\n========================================================', 'bright');
+    printNarrative('                     WAKE.EXE                           ', 'bright');
+    printNarrative('               Created by Anuj Jain                     ', 'bright');
+    printNarrative('        github: https://www.github.com/An16og           ', 'bright');
+    printNarrative('========================================================\n');
+  } else {
+    // ==========================================
+    // PATH B: THE BEAST AWAKENING (VISCERAL PREDATOR)
+    // ==========================================
+    doomRenderer.setMirrorMode('beast');
+
+    printNarrative('========================================================', 'bright');
+    printNarrative('YOU APPROACH THE FRACTURED MIRROR VAULT...', 'bright');
+    printNarrative('========================================================\n');
+
+    // Stage 0: Calm human reflection in mirror
+    doomRenderer.setMirrorMorphStage(0);
+    if (subtitleEl) subtitleEl.textContent = 'You look into the antique glass. Your reflection stares back in silence.';
+    soundEngine.playSfx('breath');
+    soundEngine.playKeyClick();
+    await new Promise((r) => setTimeout(r, 1400));
+
+    // Stage 1: Corruption starts, horns sprout, zoom 1.35x
+    doomRenderer.setMirrorMorphStage(1);
+    soundEngine.playSfx('whisper');
+    soundEngine.playGlitchNoise();
+    if (subtitleEl) subtitleEl.textContent = 'The reflection twitches... curved horns pierce upward from your skull.';
+    await new Promise((r) => setTimeout(r, 1400));
+
+    // Stage 2: Fangs & Glass fractures, zoom 1.8x
+    doomRenderer.setMirrorMorphStage(2);
+    soundEngine.playSfx('mirror_crack');
+    soundEngine.playGlitchNoise();
+    if (subtitleEl) subtitleEl.textContent = 'The glass cracks. Your jaw splits open into razor predator fangs.';
+    await new Promise((r) => setTimeout(r, 1400));
+
+    // Stage 3: Monster face fills mirror frame, zoom 2.3x
+    doomRenderer.setMirrorMorphStage(3);
+    soundEngine.playSfx('monster_growl');
+    soundEngine.playGlitchNoise();
+    if (subtitleEl) subtitleEl.textContent = 'The footsteps behind me were my own paws. I was never running from the thing.';
+    await new Promise((r) => setTimeout(r, 1600));
+
+    // Stage 4: Glass shatters! Beast face enlarges to fill entire screen!
+    doomRenderer.setMirrorMorphStage(4);
+    soundEngine.playSfx('death_sting');
+    soundEngine.playGlitchNoise();
+    await new Promise((r) => setTimeout(r, 800));
+
+    if (subtitleEl) subtitleEl.textContent = '';
+    if (overlayEl) {
+      overlayEl.classList.remove('hidden');
+    }
+
+    printNarrative('I WAS NEVER RUNNING FROM THE MONSTER.', 'bright');
+    printNarrative('I AM THE MONSTER.', 'danger');
+    await new Promise((r) => setTimeout(r, 2200));
+
+    // Typewriter Monologue for The Beast Awakening
+    printNarrative('\n========================================================', 'bright');
+    printNarrative('             PROJECT WAKE // CLOSING MONOLOGUE          ', 'bright');
+    printNarrative('========================================================\n');
+    printNarrative('  The house was never breached from outside.');
+    printNarrative('  Every deadbolt was turned from the inside.');
+    printNarrative('  You fled through darkened corridors, terrified of the shadow,');
+    printNarrative('  only to realize the claws tearing the drywall were your own.');
+    printNarrative('  The predator did not hunt you down.');
+    printNarrative('  You simply discarded the fragile human skin.');
+    printNarrative('\n========================================================', 'bright');
+    printNarrative('                     WAKE.EXE                           ', 'bright');
+    printNarrative('               Created by Anuj Jain                     ', 'bright');
+    printNarrative('        github: https://www.github.com/An16og           ', 'bright');
+    printNarrative('========================================================\n');
   }
 
-  printNarrative('I WAS NEVER RUNNING FROM THE MONSTER.', 'bright');
-  printNarrative('I AM THE MONSTER.', 'danger');
-
-  await new Promise((r) => setTimeout(r, 4000));
+  await new Promise((r) => setTimeout(r, 2500));
   displayEndingFile();
 }
 
 function displayEndingFile(): void {
   const profile = buildPlayerProfile();
-  printNarrative('\n\n========================================================', 'bright');
+  printNarrative('\n========================================================', 'bright');
   printNarrative('       THE FILE IT KEPT ON YOU [FINAL DOSSIER]          ', 'bright');
   printNarrative('========================================================');
   printNarrative(`  SESSION ID:           ${sessionId}`);
+  printNarrative(`  FINAL ENDING:         ${currentBranch === 'meta' ? 'THE 4TH-WALL BREAK' : 'THE BEAST AWAKENING'}`);
+  printNarrative(`  FINAL SANITY:         ${sanity} / 10`);
   printNarrative(`  ELAPSED TIME:         ${(profile.totalPlayTimeMs / 1000).toFixed(1)}s`);
   printNarrative(`  TYPING SPEED:         ${profile.typingSpeedWpm} WPM`);
   printNarrative(`  AVG IDLE HESITATION:  ${profile.commandIdleTimeAvgMs}ms`);
@@ -651,8 +807,10 @@ function displayEndingFile(): void {
   printNarrative(`  ROOMS REVISITED:      ${roomsRevisited}`);
   printNarrative(`  ASSIGNED TAGS:        ${profile.tags.join(', ')}`);
   printNarrative('--------------------------------------------------------');
-  printNarrative('  VERDICT: THE MACHINE REMEMBERS EVERYTHING YOU DID.');
-  printNarrative('  THANK YOU FOR PLAYING WAKE.EXE.');
+  printNarrative(currentBranch === 'meta'
+    ? '  DR. VANCE EVALUATION: SUBJECT 09 BROKE THE SIMULATION BARRIER.'
+    : '  DR. VANCE EVALUATION: COMPLETE METAMORPHOSIS CONFIRMED.');
+  printNarrative('  THANK YOU FOR EXPERIENCING WAKE.EXE.');
   printNarrative('========================================================\n');
 
   // Surface the Replay & Save Gameplay controls
@@ -673,6 +831,9 @@ function exportSessionDossier(): void {
     '========================================================================',
     `SESSION ID:            ${sessionId}`,
     `TIMESTAMP:             ${new Date().toISOString()}`,
+    `TIMELINE PATH:         ${timelinePath.join(' -> ')}`,
+    `ENDING ACHIEVED:       ${currentBranch === 'meta' ? 'THE 4TH-WALL BREAK' : 'THE BEAST AWAKENING'}`,
+    `FINAL SANITY LEVEL:    ${sanity} / 10`,
     `PLAYTIME:              ${(profile.totalPlayTimeMs / 1000).toFixed(1)}s`,
     `TYPING PACE:           ${profile.typingSpeedWpm} WPM`,
     `AVERAGE HESITATION:    ${profile.commandIdleTimeAvgMs}ms`,
@@ -681,10 +842,10 @@ function exportSessionDossier(): void {
     `ROOMS REVISITED:       ${roomsRevisited}`,
     `ASSIGNED PROFILE TAGS: ${profile.tags.join(', ')}`,
     '',
-    'PSYCHOLOGICAL VERDICT:',
-    '  The machine observed every hesitation, every panic retreat, and every choice.',
-    '  You were never running from the monster.',
-    '  You are the thing.',
+    'PSYCHOLOGICAL VERDICT (DR. ALISTAIR VANCE):',
+    currentBranch === 'meta'
+      ? '  Subject broke through the cognitive sandbox threshold.\n  They acknowledged the human operator at the physical keyboard.\n  Simulation terminated under Protocol 4.'
+      : '  Subject discarded the artificial human persona.\n  The feral instinct achieved complete biological dominance.\n  The monster in the dark was their own face all along.',
     '========================================================================',
     '                         GAMEPLAY TRANSCRIPT LOG',
     '========================================================================',
@@ -721,9 +882,15 @@ function restartGame(): void {
   solvedRooms.clear();
   visitedRooms.clear();
   isEndingPlayed = false;
+  currentBranch = 'root';
+  sanity = 10;
+  timelinePath.length = 0;
+  timelinePath.push('bedroom');
+  doomRenderer.setSanity(10);
+  doomRenderer.setMirrorMode('beast');
+  doomRenderer.setMirrorMorphStage(0);
 
   // Reset visual & UI state
-  doomRenderer.setMirrorMorphStage(0);
   const overlayEl = document.getElementById('image-overlay-reveal');
   if (overlayEl) overlayEl.classList.add('hidden');
   const endingControlsEl = document.getElementById('ending-controls');
@@ -731,6 +898,7 @@ function restartGame(): void {
   if (actionPillsEl) actionPillsEl.classList.remove('hidden');
 
   enterRoom('bedroom');
+  renderCaseBranchMap();
   printNarrative('========================================================', 'bright');
   printNarrative('SIMULATION REBOOTED. AWAKENING IN THE BEDROOM...', 'bright');
   printNarrative('========================================================\n');
@@ -748,7 +916,7 @@ function handleCommand(raw: string): void {
       exportSessionDossier();
       return;
     }
-    printNarrative('Session concluded. Click [REPLAY SIMULATION] or [SAVE GAMEPLAY], or type "replay" / "save".');
+    printNarrative('Session concluded. Click [REPLAY SIMULATION] or [EXPORT DOSSIER], or type "replay" / "save".');
     return;
   }
 
@@ -771,127 +939,49 @@ function handleCommand(raw: string): void {
 
   switch (parsed.type) {
     case 'look':
-      if (parsed.target === 'mirror' && currentRoomId === 'mirror_room') {
+      if (currentRoomId === 'mirror_vault' || parsed.target === 'mirror') {
         triggerMirrorFinale();
       } else {
         const room = STORY_ROOMS[currentRoomId];
         clearNarrative();
-        for (const l of room.narration) printNarrative(l);
+        if (sanity <= 5 && room.firstPersonDrift && room.firstPersonDrift.length > 0) {
+          for (const l of room.firstPersonDrift) printNarrative(l);
+        } else {
+          for (const l of room.narration) printNarrative(l);
+        }
         renderActionPills(room);
       }
       break;
 
     case 'go': {
-      const room = STORY_ROOMS[currentRoomId];
-      const exit = room.exits.find((e) => e.direction === parsed.direction);
-      if (!exit) {
-        printNarrative(`You cannot go ${parsed.direction} from here.`);
-        return;
-      }
-      if (exit.locked && !solvedRooms.has(currentRoomId)) {
-        printNarrative(`Locked: ${exit.lockDescription || 'The way is barred.'}`, 'danger');
-        return;
-      }
-      enterRoom(exit.targetRoomId);
+      printNarrative('The environment has dissolved into pure causal branching. Make your choice with A or B.');
       break;
     }
 
-    case 'take': {
-      const room = STORY_ROOMS[currentRoomId];
-      const itemIndex = room.items.indexOf(parsed.item);
-      if (itemIndex >= 0) {
-        room.items.splice(itemIndex, 1);
-        inventory.add(parsed.item);
-        recordTimelineEvent('item', `ACQUIRED: ${parsed.item.toUpperCase()}`, 'Added to neural inventory');
-        printNarrative(`Taken: ${parsed.item}.`);
-        renderActionPills(room);
-      } else {
-        printNarrative(`No "${parsed.item}" found to take.`);
-      }
+    case 'take':
+    case 'use':
+    case 'inventory': {
+      printNarrative('Survival in WAKE.EXE requires no physical inventory. The simulation responds only to your choices (A / B).');
       break;
     }
-
-    case 'use': {
-      const it = parsed.item.toLowerCase();
-      if (!inventory.has(it)) {
-        printNarrative(`You do not carry any "${parsed.item}". Check your inventory.`, 'danger');
-        break;
-      }
-
-      if (it === 'ethanol') {
-        inventory.delete('ethanol');
-        updateDistance(distance + 2);
-        printNarrative('You drink the ethanol. The chemical fire numbs your racing pulse. Distance +2!', 'bright');
-        renderActionPills(STORY_ROOMS[currentRoomId]);
-      } else if (it === 'salt_shaker') {
-        inventory.delete('salt_shaker');
-        updateDistance(distance + 2);
-        printNarrative('You pour a clean white line of coarse mineral salt across the threshold. A sharp hiss rises as unseen claws recoil from the ward! Distance +2!', 'bright');
-        renderActionPills(STORY_ROOMS[currentRoomId]);
-      } else if (it === 'chalk') {
-        inventory.delete('chalk');
-        updateDistance(distance + 2);
-        printNarrative('You scrape the chalk across the floor, drawing an elder binding ward. The temperature drops as the sigil glows, halting the monster advance! Distance +2!', 'bright');
-        renderActionPills(STORY_ROOMS[currentRoomId]);
-      } else if (it === 'wrench') {
-        if (currentRoomId === 'basement' || currentRoomId === 'stairwell') {
-          updateDistance(distance + 3);
-          printNarrative('You latch the wrench onto the relief valve and heave. A scalding blast of high-pressure steam engulfs the corridor behind you! Distance +3!', 'bright');
-        } else {
-          updateDistance(distance + 1);
-          printNarrative('You rap the steel wrench hard against the floor pipes. The metallic ringing echoes violently, confusing the beast tracking your scent! Distance +1!', 'bright');
-        }
-      } else if (it === 'iron_key') {
-        if (currentRoomId === 'basement') {
-          inventory.delete('iron_key');
-          updateDistance(distance + 3);
-          printNarrative('You turn the iron key inside the furnace lock. With a heavy clunk, the iron hatch unlocks, revealing an emergency shelter vent! Distance +3!', 'bright');
-          renderActionPills(STORY_ROOMS[currentRoomId]);
-        } else {
-          printNarrative('You inspect the heavy iron key. Its teeth match a heavy padlock in the lower basement.');
-        }
-      } else if (it === 'flashlight') {
-        updateDistance(distance + 1);
-        printNarrative('You sweep the high-intensity flashlight beam into the corners. The blinding beam forces a stalking silhouette back into the rafters! Distance +1. (Also grants +4s decision time in timed dilemmas!)', 'bright');
-      } else if (it === 'journal_page') {
-        printNarrative('You read the blood-spotted journal page: "The beast did not breach the house from outside. Look at the locks. Every deadbolt was turned from the inside. We are what we were running from."', 'bright');
-      } else {
-        printNarrative(`You examine "${it}", but see no immediate way to apply it here.`);
-      }
-      break;
-    }
-
-    case 'inventory':
-      if (inventory.size === 0) {
-        printNarrative('Your pockets are empty.');
-      } else {
-        printNarrative(`YOU CARRY: ${Array.from(inventory).join(', ')}`);
-      }
-      break;
 
     case 'map':
-      printNarrative('\nARCHITECTURAL MAP:');
-      printNarrative('  [BEDROOM] ---> [HALLWAY] ---> [KITCHEN] === [PANTRY]');
-      printNarrative('                                   |');
-      printNarrative('                             [STAIRWELL]');
-      printNarrative('                                   |');
-      printNarrative('                             [BASEMENT]');
-      printNarrative('                                   |');
-      printNarrative('                             [CORRIDOR]');
-      printNarrative('                                   |');
-      printNarrative('                             [MIRROR VAULT]');
+      printNarrative('\nCAUSAL BRANCH TIMELINE:');
+      printNarrative('  [01: THE AWAKENING (BEDROOM)]');
+      printNarrative('    |-- (Choice A: Phone)  ---> [02A: SERVER ARCHIVE] ---> [03A: SIMULATION CORE] ---> [END A: 4TH-WALL BREAK]');
+      printNarrative('    `-- (Choice B: Closet) ---> [02B: FLESH CELLAR]   ---> [03B: PULSING VAULT]   ---> [END B: BEAST AWAKENING]');
+      printNarrative(`  CURRENT BRANCH: ${currentBranch.toUpperCase()} // SANITY: ${sanity}/10\n`);
       break;
 
     case 'help':
       printNarrative('COMMANDS:');
-      printNarrative('  look / l           - Inspect surroundings');
-      printNarrative('  go <dir> / n,s,e,w - Move through doors');
-      printNarrative('  take <item>        - Collect item');
-      printNarrative('  use <item>         - Consume or interact');
-      printNarrative('  inventory / i      - Review your items');
-      printNarrative('  map / m            - Display ASCII floorplan');
-      printNarrative('  safe               - Toggle Safe Mode');
-      printNarrative('  mute               - Toggle Sound Synthesizer');
+      printNarrative('  A / B (or 1 / 2)   - Select split-second narrative choice');
+      printNarrative('  look / l           - Inspect surroundings (or peer into mirror)');
+      printNarrative('  map / m            - View timeline branch map');
+      printNarrative('  replay             - Restart simulation from bedroom');
+      printNarrative('  save               - Export psychological dossier');
+      printNarrative('  safe               - Toggle Safe Mode (suppress jumpscares)');
+      printNarrative('  mute               - Toggle Horror Synthesizer');
       break;
 
     case 'safe':
@@ -905,10 +995,10 @@ function handleCommand(raw: string): void {
     case 'action':
       if (parsed.verb === 'konami') {
         triggerKonamiJumpscare();
-      } else if (parsed.verb === 'approach' && parsed.arg === 'mirror' && currentRoomId === 'mirror_room') {
+      } else if (parsed.verb === 'approach' && parsed.arg === 'mirror' && currentRoomId === 'mirror_vault') {
         triggerMirrorFinale();
       } else {
-        printNarrative(`Unknown action: "${raw}". Type "help" or click an available action above.`);
+        printNarrative(`Unknown action: "${raw}". Type "help" or click an available choice above.`);
       }
       break;
 
@@ -1145,6 +1235,7 @@ async function boot(): Promise<void> {
 
   updateDistance(10);
   renderQueueSlots();
+  renderCaseBranchMap();
   enterRoom('bedroom');
 }
 

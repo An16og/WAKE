@@ -70,6 +70,9 @@ export const BandersnatchChoiceSchema = z.object({
   description: z.string(),
   consequence: z.string(),
   distanceDelta: z.number().int().default(0),
+  nextRoomId: z.string().optional(),
+  branchId: z.enum(['meta', 'beast']).optional(),
+  sanityDelta: z.number().int().default(0),
   requiredItem: z.string().optional()
 });
 export type BandersnatchChoice = z.infer<typeof BandersnatchChoiceSchema>;

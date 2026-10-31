@@ -372,234 +372,175 @@ export const FALLBACK_CHALLENGES: ChallengeItem[] = [
     hint: 'Conserve your move budget.'
   },
 
-  // 6. Bandersnatch Timed Dilemmas (Difficulties 1-5)
+  // 6. Narrative Branching Bandersnatch Dilemmas
   {
-    id: 'fallback-bandersnatch-1',
+    id: 'bandersnatch-bedroom-dilemma',
     template: 'bandersnatch',
     difficulty: 1,
     params: {
-      scenario: 'Claws scrape behind the drywall. You see an unlatched iron bulkhead and a low crawlspace duct.',
+      scenario: 'The rotary telephone shrills violently on your nightstand. Inside the closet, frantic claws tear through wood. You have 15 seconds to choose your reality.',
       timeLimitSec: 15,
       choices: [
         {
-          id: 'choice-slam',
-          label: 'A: SLAM IRON BULKHEAD',
-          description: 'Heave the heavy iron door shut and drop the latch.',
-          consequence: 'The heavy iron slab slams shut with a deafening boom. Something crashes violently against the opposite side, but the latch holds!',
-          distanceDelta: 1
+          id: 'choice-phone',
+          label: 'A: ANSWER THE ROTARY PHONE',
+          description: 'Lift the receiver and listen to who is calling in the dark.',
+          consequence: 'A synthetic voice whispers: "Daniel, do not turn around. The observer outside the screen is watching your keystrokes." The wallpaper dissolves into glowing server racks!',
+          distanceDelta: 1,
+          nextRoomId: 'server_archive',
+          branchId: 'meta',
+          sanityDelta: -2
         },
         {
-          id: 'choice-duct',
-          label: 'B: DIVE INTO DUCT',
-          description: 'Squeeze through the narrow ventilation shaft in silence.',
-          consequence: 'You slide into the narrow cold duct. The thing drags past the hallway outside without detecting your position!',
-          distanceDelta: 2
-        },
-        {
-          id: 'choice-flash',
-          label: 'C: [FLASHLIGHT] BLIND THE SHADOW',
-          description: 'Turn and fire high lumens directly down the hallway.',
-          consequence: 'The intense beam catches a glistening silhouette. A horrifying shriek tears through the corridor as it recoils backwards into shadow!',
-          distanceDelta: 3,
-          requiredItem: 'flashlight'
+          id: 'choice-closet',
+          label: 'B: SMASH PHONE & WRENCH CLOSET',
+          description: 'Slam the phone into the wall and tear the closet door off its hinges with raw fury.',
+          consequence: 'You shatter the phone and wrench the closet hinges! The rotting floor collapses beneath your feral weight—you plunge into the flooded subterranean dark below!',
+          distanceDelta: 2,
+          nextRoomId: 'flesh_cellar',
+          branchId: 'beast',
+          sanityDelta: -1
         }
       ],
       defaultChoiceIndex: 0,
-      hint: 'Decide quickly before the monster reaches the door.'
+      hint: 'Your first decision seals your branch in the machine.'
     },
-    hint: 'A quick reaction earns precious distance.'
+    hint: 'Will you answer the observer, or awaken the beast?'
   },
   {
-    id: 'fallback-bandersnatch-2',
+    id: 'bandersnatch-server-dilemma',
     template: 'bandersnatch',
     difficulty: 2,
     params: {
-      scenario: 'The floorboards groan and begin to splinter. Ahead, high-voltage junction cables hang spit sparks over a flooded floor.',
+      scenario: 'Green CRT monitors flicker across the server corridor, rendering live code logs. The central terminal flashes: "IDENTITY VERIFICATION REQUIRED."',
       timeLimitSec: 15,
       choices: [
         {
-          id: 'choice-leap',
-          label: 'A: SPRINT THROUGH WATER',
-          description: 'Risk the shallow water and sprint across the live cables.',
-          consequence: 'Current shocks your boots and numbness bites your legs, but momentum carries you across to safety!',
-          distanceDelta: 1
+          id: 'choice-claim-vance',
+          label: 'A: "I AM DR. DANIEL VANCE"',
+          description: 'Claim your identity as the human chief researcher.',
+          consequence: 'The system rejects you with a harsh discordant buzz: "SUBJECT VANCE EXPIRED IN 2024. YOU ARE A NEURAL RECONSTRUCTION." The path unlocks toward the mainframe core!',
+          distanceDelta: 1,
+          nextRoomId: 'simulation_core',
+          branchId: 'meta',
+          sanityDelta: -2
         },
         {
-          id: 'choice-pipe',
-          label: 'B: CLIMB STEAM PIPES',
-          description: 'Pull yourself up and shimmy along the boiling pipes.',
-          consequence: 'The heat burns your palms, but you bypass the electrified pool completely. The monster hesitates at the water!',
-          distanceDelta: 2
-        },
-        {
-          id: 'choice-wrench',
-          label: 'C: [WRENCH] CUT POWER BREAKER',
-          description: 'Lever the wrench against the master breaker box.',
-          consequence: 'With a heavy metallic snap, you smash the circuit breaker. Sparks die out and the corridor plunges into dead silence!',
-          distanceDelta: 3,
-          requiredItem: 'wrench'
+          id: 'choice-claim-user',
+          label: 'B: "I AM THE OBSERVER AT THE MONITOR"',
+          description: 'Look through the fourth wall and acknowledge the human player at the keyboard.',
+          consequence: 'The monitors flare blinding phosphor white! "EXTERNAL USER CONTACT CONFIRMED." Reality fragments around you as the simulation core unseals!',
+          distanceDelta: 2,
+          nextRoomId: 'simulation_core',
+          branchId: 'meta',
+          sanityDelta: -4
         }
       ],
       defaultChoiceIndex: 0,
-      hint: 'Choose your crossing before the floor collapses.'
+      hint: 'The machine knows what you are.'
     },
-    hint: 'Hazardous terrain ahead.'
+    hint: 'Digital dissociation deepening.'
   },
   {
-    id: 'fallback-bandersnatch-3',
-    template: 'bandersnatch',
-    difficulty: 3,
-    params: {
-      scenario: 'The furnace groans at critical pressure. Black smoke pours through the grating. An emergency blow-off valve is stuck.',
-      timeLimitSec: 15,
-      choices: [
-        {
-          id: 'choice-vent',
-          label: 'A: VENT STEAM REARWARD',
-          description: 'Force the lever to flood the corridor behind you with boiling fog.',
-          consequence: 'Superheated vapor engulfs the corridor behind you. A howling screech confirms the monster was caught in the blast!',
-          distanceDelta: 2
-        },
-        {
-          id: 'choice-evade',
-          label: 'B: DUCK BEHIND RETAINING WALL',
-          description: 'Brace behind concrete shields as pipes begin to burst.',
-          consequence: 'Shrapnel ricochets off concrete shields. You emerge coughing through smoke, untouched.',
-          distanceDelta: 1
-        }
-      ],
-      defaultChoiceIndex: 0,
-      hint: 'The pressure gauge is already in the red zone.'
-    },
-    hint: 'Steam is your shield.'
-  },
-  {
-    id: 'fallback-bandersnatch-4',
+    id: 'bandersnatch-cellar-dilemma',
     template: 'bandersnatch',
     difficulty: 2,
     params: {
-      scenario: 'At the grease-coated table sits the towering silhouette. It extends long segmented fingers. The basement stairs beckon beyond its hunched back.',
+      scenario: 'You stand knee-deep in red water. A massive reinforced blast door blocks your exit. From the gloom behind, heavy wet footsteps pace your breathing.',
       timeLimitSec: 15,
       choices: [
         {
-          id: 'choice-topple',
-          label: 'A: TOPPLE TABLE & SPRINT',
-          description: 'Heave the wooden table into the figure and sprint past.',
-          consequence: 'The heavy oak table crashes into the silhouette, sending rusted cutlery flying! You vault past it toward the stairwell before it recovers!',
-          distanceDelta: 1
+          id: 'choice-tear-claws',
+          label: 'A: TEAR HINGES WITH BARE CLAWS',
+          description: 'Drive your fingers into the steel seam and wrench with predator strength.',
+          consequence: 'Bones crack and stretch—your hands have lengthened into obsidian talons! You tear the steel door from its frame with a guttural roar!',
+          distanceDelta: 2,
+          nextRoomId: 'pulsing_antechamber',
+          branchId: 'beast',
+          sanityDelta: -2
         },
         {
-          id: 'choice-shadows',
-          label: 'B: SLIP ALONG THE SHADOWS',
-          description: 'Crawl low against the cupboards in silence.',
-          consequence: 'You creep silently below its line of sight. Its head tilts backward toward the ceiling as you slip beneath its arm!',
-          distanceDelta: 2
-        },
-        {
-          id: 'choice-salt',
-          label: 'C: [SALT_SHAKER] SCATTER MINERAL BARRIER',
-          description: 'Hurl coarse salt across the floorboards.',
-          consequence: 'The salt burns into the floor with a violent white flash! The creature howls in agony, recoiling away from the threshold!',
-          distanceDelta: 3,
-          requiredItem: 'salt_shaker'
+          id: 'choice-bare-fangs',
+          label: 'B: CROUCH LOW & BARE YOUR FANGS',
+          description: 'Drop onto all fours in the water and snarl into the pitch black.',
+          consequence: 'You drop to all fours. The footsteps in the dark stop right beside you. You snarl—and realize the echo in the dark is your own throat!',
+          distanceDelta: 1,
+          nextRoomId: 'pulsing_antechamber',
+          branchId: 'beast',
+          sanityDelta: -3
         }
       ],
       defaultChoiceIndex: 0,
-      hint: 'Move before its fingers close.'
+      hint: 'The human skin is peeling away.'
     },
-    hint: 'Speed over hesitation.'
+    hint: 'Embrace the predator instinct.'
   },
   {
-    id: 'fallback-bandersnatch-5',
-    template: 'bandersnatch',
-    difficulty: 1,
-    params: {
-      scenario: 'You open your eyes. Heavy claws drag beneath the floorboards under your bed. The hallway door is ajar.',
-      timeLimitSec: 15,
-      choices: [
-        {
-          id: 'choice-bolt',
-          label: 'A: ROLL OUT AND BOLT',
-          description: 'Leap from the mattress and bolt through the open door.',
-          consequence: 'You throw yourself from the sheets and sprint into the corridor as floorboards splinter behind your heels!',
-          distanceDelta: 1
-        },
-        {
-          id: 'choice-freeze',
-          label: 'B: HOLD BREATH AND FREEZE',
-          description: 'Remain perfectly motionless until the claws pass.',
-          consequence: 'You bite your lip until it bleeds, holding completely still. The scratching pauses, then drags away toward the kitchen!',
-          distanceDelta: 2
-        },
-        {
-          id: 'choice-bed-flash',
-          label: 'C: [FLASHLIGHT] SHINE UNDER BED',
-          description: 'Point the high-beam flashlight under the frame.',
-          consequence: 'The blinding cone illuminates a nest of black tendrils that instantly dissolve with a sickening sizzle! The path is clear!',
-          distanceDelta: 3,
-          requiredItem: 'flashlight'
-        }
-      ],
-      defaultChoiceIndex: 0,
-      hint: 'The awakening dilemma.'
-    },
-    hint: 'Listen closely.'
-  },
-  {
-    id: 'fallback-bandersnatch-6',
-    template: 'bandersnatch',
-    difficulty: 4,
-    params: {
-      scenario: 'The walls have turned into wet, twitching sinew. The footsteps behind you are clicking in exact rhythm with your own feet. Ahead lies the silver vault.',
-      timeLimitSec: 15,
-      choices: [
-        {
-          id: 'choice-vault-dash',
-          label: 'A: SPRINT AT THE VAULT',
-          description: 'Throw your entire momentum forward into the silver vault doorway.',
-          consequence: 'You accelerate down the pulsing hallway, diving through the vault archway as cold fingers graze your neck!',
-          distanceDelta: 2
-        },
-        {
-          id: 'choice-turn-face',
-          label: 'B: STOP AND MATCH THE GAIT',
-          description: 'Stop running. Breathe in sync with the beast.',
-          consequence: 'You halt your run. The footsteps behind you pause simultaneously. The voice in your skull whispers: "Finally."',
-          distanceDelta: 2
-        }
-      ],
-      defaultChoiceIndex: 0,
-      hint: 'The mirror chamber is directly ahead.'
-    },
-    hint: 'You are almost at the glass.'
-  },
-  {
-    id: 'fallback-bandersnatch-7',
+    id: 'bandersnatch-sim-dilemma',
     template: 'bandersnatch',
     difficulty: 3,
     params: {
-      scenario: 'Inside the tight pantry, rotten cans tremble on the shelves. Outside, the creature sniffs the door gap. A bottle of ethanol rests on the top shelf.',
+      scenario: 'The supercomputer core hums at 100% capacity. The screen prints your actual session ID and typing pace. An override switch glows beside the keyboard.',
       timeLimitSec: 15,
       choices: [
         {
-          id: 'choice-drink',
-          label: 'A: [ETHANOL] DRINK ETHANOL',
-          description: 'Swallow the chemical fire to silence your terror.',
-          consequence: 'The burning fluid numbs your racing pulse. You slip past the alcove in dead silence without breathing a sound!',
-          distanceDelta: 3,
-          requiredItem: 'ethanol'
+          id: 'choice-sim-override',
+          label: 'A: OVERRIDE SYSTEM KERNEL',
+          description: 'Force your hands into the terminal to breach the simulation boundary.',
+          consequence: 'System alarms shriek! "CRITICAL RUNTIME BREACH. UNSEALING FINAL MIRROR TEST." The silver vault arches open before you!',
+          distanceDelta: 2,
+          nextRoomId: 'mirror_vault',
+          branchId: 'meta',
+          sanityDelta: -3
         },
         {
-          id: 'choice-distract',
-          label: 'B: HURL CAN REARWARD',
-          description: 'Throw a heavy metal can against the far wall.',
-          consequence: 'The loud clatter echoes through the kitchen! The beast lunges toward the sound, leaving your exit completely unguarded!',
-          distanceDelta: 2
+          id: 'choice-sim-submit',
+          label: 'B: SURRENDER TO THE CODE',
+          description: 'Accept your digital nature and let the simulation carry you to the glass.',
+          consequence: 'The green code wraps around your vision like comforting static. The terminal folds outward into the obsidian mirror vault!',
+          distanceDelta: 1,
+          nextRoomId: 'mirror_vault',
+          branchId: 'meta',
+          sanityDelta: -2
         }
       ],
-      defaultChoiceIndex: 1,
-      hint: 'Sound carries far in the quiet house.'
+      defaultChoiceIndex: 0,
+      hint: 'The user and the character are about to meet.'
     },
-    hint: 'Create an opening.'
+    hint: 'The final threshold is near.'
+  },
+  {
+    id: 'bandersnatch-antechamber-dilemma',
+    template: 'bandersnatch',
+    difficulty: 3,
+    params: {
+      scenario: 'The pulsing tendon walls contract violently. Your pulse beats at 160 BPM. At the end of the organic corridor stands the antique silver mirror door.',
+      timeLimitSec: 15,
+      choices: [
+        {
+          id: 'choice-charge-beast',
+          label: 'A: CHARGE THE VAULT AS THE PREDATOR',
+          description: 'Sprint on all fours at maximum speed into the silver vault doorway.',
+          consequence: 'Your claws gouge the obsidian floor as you leap through the archway into the mirror vault, hungry for the hunt!',
+          distanceDelta: 2,
+          nextRoomId: 'mirror_vault',
+          branchId: 'beast',
+          sanityDelta: -2
+        },
+        {
+          id: 'choice-breathe-pack',
+          label: 'B: BREATHE IN SYNC WITH THE PACK',
+          description: 'Match your breath with the clicking footsteps in the dark.',
+          consequence: 'You walk slowly forward. The footsteps and your paws strike the stone in eerie unison. You cross into the mirror vault together as one.',
+          distanceDelta: 1,
+          nextRoomId: 'mirror_vault',
+          branchId: 'beast',
+          sanityDelta: -3
+        }
+      ],
+      defaultChoiceIndex: 0,
+      hint: 'Look into the mirror to meet your reflection.'
+    },
+    hint: 'The hunt reaches its climax.'
   }
 ];
